@@ -1,0 +1,86 @@
+{
+  "groupTitle": "식품의약품안전처(MFDS)가 2025년도 정부업무평가에서 혁신적인 성과를 인정받아 우수기관으로 선정된 결과를 발표하는 내용입니다. 해당 발표는 2026년 1월 28일에 혁신행정담당관에서 등록했으며, 관련 담당자 및 연락처가 함께 제공되었습니다.",
+  "title": "식품의약품안전처(MFDS)가 2025년도 정부업무평가에서 혁신적인 성과를 인정받아 우수기관으로 선정된 결과를 발표하는 내용입니다. 해당 발표는 2026년 1월 28일에 혁신행정담당관에서 등록했으며, 관련 담당자 및 연락처가 함께 제공되었습니다.",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0.7354762499999999,
+    "imageCost": 290,
+    "audioCost": 5.950000000000001,
+    "totalCost": 296.68547624999997
+  },
+  "scenes": [
+    {
+      "text": "식품의약품안전처가 정부업무평가에서 혁신적인 성과를 인정받아 우수기관으로 선정되었습니다.",
+      "title": "우수기관 선정",
+      "imagePrompt": "A bold, vector-art infographic poster emphasizing achievement. The main title '식약처 우수기관 선정' (MFDS Excellent Institution Selection) is prominent in large, clean Korean typography. Below it, a large, stylized gold trophy icon clearly labeled '2025년도 정부업무평가' in Korean. Use government blue and white colors, maintaining a clean, high-impact vector layout.",
+      "imageUrl": "/generated/img_1769672121830_nr83eh.jpg",
+      "status": "approved",
+      "subtitle": "2025년도 정부업무평가",
+      "duration": 11,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769672217764.wav",
+      "audioDuration": 8.171875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "정부업무평가는 각 부처의 혁신성과 효율성을 종합적으로 측정하는 중요한 제도입니다. 식약처의 역할과 기여도가 높이 평가되었습니다.",
+      "title": "평가의 주체",
+      "imagePrompt": "A split-screen vector infographic illustrating the scope of the evaluation. On the left, a flat vector icon representing the central government ('국가/정부' in Korean). On the right, a detailed icon representing food safety and public health (a shield protecting food/medicine), labeled '식품의약품안전처' in Korean. A central flowchart uses thick arrows labeled '평가 항목' (Evaluation Items) to show the relationship. Use a formal, structured infographic design.",
+      "imageUrl": "/generated/img_1769672160641_p8b1gn.jpg",
+      "status": "approved",
+      "subtitle": "정부업무평가란?",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769672241372.wav",
+      "audioDuration": 11.931875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "이번 우수기관 선정은 식약처 혁신행정담당관의 체계적인 업무 처리와 행정 혁신 노력이 결실을 맺은 결과입니다.",
+      "title": "성과 인정",
+      "imagePrompt": "A structured vector infographic chart focusing on the department responsible. Use a clean, two-column table layout. The left column header is '등록 부서' (Registered Department) and the right header is '평가 결과' (Evaluation Result). Below the headers, the text '혁신행정담당관' (Innovation Administration Office) and '우수기관' (Excellent Institution) are clearly displayed in bold, structured Korean typography with accompanying achievement icons.",
+      "imageUrl": "/generated/img_1769672164207_243oi.jpg",
+      "status": "approved",
+      "subtitle": "혁신행정담당관 등록",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "해당 성과 발표는 2026년 1월 28일에 게시되었습니다. 이는 2025년도 업무 성과에 대한 최종 확정 발표입니다.",
+      "title": "게시 정보",
+      "imagePrompt": "A modern timeline infographic layout. A large calendar vector graphic clearly shows January 28th, 2026 highlighted. An accompanying clock icon and banner explicitly displays the date '2026-01-28' in large, bold Korean text. Beneath the calendar, a small, professional caption reads: '2025년도 업무평가 결과 공표' (2025 Performance Evaluation Result Announcement).",
+      "imageUrl": "/generated/img_1769672166671_92222.jpg",
+      "status": "approved",
+      "subtitle": "2026-01-28 게시",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": false
+    },
+    {
+      "text": "평가 내용에 대한 추가 문의는 담당자 김현아 또는 소담이에게 연락해 주시기 바랍니다.",
+      "title": "문의 사항",
+      "imagePrompt": "An icon-heavy infographic panel for contact details displayed in a modern, organized layout. Three distinct boxes or cards are arranged horizontally. The first box features a person icon and the text '담당자: 김현아/소담이'. The second box features a phone icon and the number '전화: 043-719-1461'. The third box features an info icon and the text '혁신행정담당관'. All text must be clean, structured Korean typography embedded in the vector art.",
+      "imageUrl": "/generated/img_1769672164948_cyrjrs.jpg",
+      "status": "approved",
+      "subtitle": "담당자 및 연락처",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": false
+    }
+  ],
+  "id": "recHBLgbBUJ1lVJV5",
+  "createdAt": "2026-01-29T07:38:49.954Z",
+  "updatedAt": "2026-01-29T07:38:49.954Z",
+  "videoPath": "/projects/recHBLgbBUJ1lVJV5/video.webm",
+  "thumbnailPath": "/projects/recHBLgbBUJ1lVJV5/thumbnail.jpg"
+}

@@ -1,0 +1,87 @@
+{
+  "groupTitle": "성동구1인가구지원센터는 2026년 사근동마을활력 1인가구 공모사업을 모집합니다. 신청 기간은 2026년 1월 21일부터 2월 25일까지이며, 성동구 거주 또는 생활권의 5인 이상 모임이 신청할 수 있습니다. 공모 분야는 1인가구를 위한 자유 주제이며, 이메일로 접수합니다. 문의는 성동구1인가구지원센터(02-2281-7715)로 하면 됩니다.",
+  "title": "성동구1인가구지원센터는 2026년 사근동마을활력 1인가구 공모사업을 모집합니다. 신청 기간은 2026년 1월 21일부터 2월 25일까지이며, 성동구 거주 또는 생활권의 5인 이상 모임이 신청할 수 있습니다. 공모 분야는 1인가구를 위한 자유 주제이며, 이메일로 접수합니다. 문의는 성동구1인가구지원센터(02-2281-7715)로 하면 됩니다. - 1",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0.9482999999999999,
+    "imageCost": 290,
+    "audioCost": 15.25,
+    "totalCost": 306.1983
+  },
+  "scenes": [
+    {
+      "text": "2026년, 사근동에서 새로운 시작을 함께할 1인가구를 찾습니다! 성동구1인가구지원센터가 여러분의 아이디어를 기다립니다.",
+      "title": "사근동마을활력 공모전",
+      "imagePrompt": "Infographic chart with a large title: \"사근동마을활력 공모전 (Saguenong Village Vitality Contest)\". Subtitle: \"새로운 아이디어를 기다립니다! (We're Waiting for New Ideas!)\". Chart sections include: Application Period (2026. 1. 21 ~ 2. 25), Eligibility (5+ people in Seongdong-gu), Subject (Free topic for single-person households), Application Method (Email). Use bright, inviting colors. Feature an image of a smiling single person looking toward a vibrant community scene. Structured data display with icons for each category. Korean text is bold and prominent.",
+      "imageUrl": "/generated/img_1769151408951_tfk233.jpg",
+      "status": "approved",
+      "subtitle": "새로운 아이디어를 기다립니다!",
+      "duration": 12,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769151555535.wav",
+      "audioDuration": 9.091875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "1인가구를 위한 당신의 아이디어가 사근동을 바꿀 수 있습니다. 문화, 환경, 교육, 지역경제, 안전 등 어떤 분야든 좋습니다.",
+      "title": "자유로운 공모 분야",
+      "imagePrompt": "Infographic style with the title \"자유로운 공모 분야 (Free Contest Category)\" at the top. Subtitle: \"1인가구를 위한 아이디어를 펼쳐보세요 (Show off your ideas for single-person households)\". Sections include icons and short descriptions for Culture (문화), Environment (환경), Education (교육), Local Economy (지역경제), Safety (안전). Each section includes 2-3 bullet points summarizing potential project ideas. Feature happy 1-person household members participating in a community event. Ensure all Korean text is displayed prominently as bold graphic elements.",
+      "imageUrl": "/generated/img_1769151437109_p1nfjk.jpg",
+      "status": "approved",
+      "subtitle": "1인가구를 위한 아이디어를 펼쳐보세요",
+      "duration": 12,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769151565697.wav",
+      "audioDuration": 9.611875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "신청은 간단합니다. 2026년 2월 25일 18시까지 이메일(sungdong9solo@daum.net)로 접수하세요.",
+      "title": "간편한 신청 방법",
+      "imagePrompt": "Step-by-step flow chart titled \"간편한 신청 방법 (Simple Application Method)\". Subtitle: \"이메일 접수 (Email application)\". Step 1: Download the application form (신청서 다운로드). Step 2: Fill out the form (신청서 작성). Step 3: Submit via email to sungdong9solo@daum.net (이메일 제출). Each step includes a clear icon and brief description. Use Seongdong-gu's official colors. Include a visual representation of sending an email. Ensure that all Korean text is displayed in a bold, readable font.",
+      "imageUrl": "/generated/img_1769151466259_ostt1x.jpg",
+      "status": "approved",
+      "subtitle": "이메일 접수",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769151576971.wav",
+      "audioDuration": 11.851875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "궁금한 점이 있다면 언제든지 성동구1인가구지원센터(02-2281-7715)로 문의해주세요. 친절하게 안내해 드립니다.",
+      "title": "문의 안내",
+      "imagePrompt": "Split screen comparison. Left side: Title: \"문의 안내 (Inquiry Information)\". Subtitle: \"성동구1인가구지원센터 (Seongdong-gu Single-Person Household Support Center)\". Contains contact information: Phone: 02-2281-7715. Right side: A friendly center staff member answering the phone. Emphasize the helpfulness and approachability of the center. The center's logo is displayed prominently. Ensure Korean phone number and center name are highly visible as bold, graphic text.",
+      "imageUrl": "/generated/img_1769151491652_4ftnp.jpg",
+      "status": "approved",
+      "subtitle": "성동구1인가구지원센터",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769151587390.wav",
+      "audioDuration": 11.251875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "사근동 주민들과 함께 만들어가는 활기찬 미래, 지금 바로 참여하세요!",
+      "title": "함께 만드는 미래",
+      "imagePrompt": "An infographic showing a vibrant community in Saguenong. Title: \"함께 만드는 미래 (Creating the Future Together)\" Subtitle: \"사근동에서 시작하세요 (Start in Saguenong)\". Include visuals of community gardens, shared workspaces, and cultural events. Show 1-person households interacting positively in the community. Use a warm, inviting color palette. Korean text should be bold, clear, and integrated into the visual layout as titles and descriptions.",
+      "imageUrl": "/generated/img_1769151515654_q410vx.jpg",
+      "status": "approved",
+      "subtitle": "사근동에서 시작하세요",
+      "duration": 8,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769151593634.wav",
+      "audioDuration": 5.491875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "950bd82f-7136-4ad8-8fea-714ac91aaa66",
+  "createdAt": "2026-01-23T07:00:54.872Z",
+  "videoPath": "/projects/950bd82f-7136-4ad8-8fea-714ac91aaa66/video.webm",
+  "thumbnailPath": "/projects/950bd82f-7136-4ad8-8fea-714ac91aaa66/thumbnail.jpg"
+}

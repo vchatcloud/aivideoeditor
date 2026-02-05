@@ -1,0 +1,101 @@
+{
+  "groupTitle": "2026년 저소득층 중·고등학생 교육바우처 지원사업 대상자 모집 안내. 지원 대상은 여수시에 거주하는 저소득층 중·고등학생이며, 2026년 3월부터 12월까지 직업기술, 기예, 예능 분야 학원 수강료를 월 10만원 정액 지원합니다. 접수는 읍·면사무소, 동 주민센터에서 가능합니다.",
+  "title": "2026년 저소득층 중·고등학생 교육바우처 지원사업 대상자 모집 안내. 지원 대상은 여수시에 거주하는 저소득층 중·고등학생이며, 2026년 3월부터 12월까지 직업기술, 기예, 예능 분야 학원 수강료를 월 10만원 정액 지원합니다. 접수는 읍·면사무소, 동 주민센터에서 가능합니다. - 1",
+  "duration": 30,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 348,
+    "audioCost": 19,
+    "totalCost": 367
+  },
+  "scenes": [
+    {
+      "text": "희망찬 2026년, 여수시에서 저소득층 중고등학생을 위한 교육 바우처 지원 사업을 시작합니다! 꿈을 향한 도전을 응원합니다.",
+      "title": "교육 바우처 시작",
+      "imagePrompt": "Anime style, A heartwarming scene of a high school student receiving a voucher. The student is smiling, holding the voucher with 여수시 로고. Background shows 여수시 야경. The scene should be bright and encouraging. In the foreground, large Korean text reading \"교육 바우처 시작\" in bold, infographic style. Below, smaller Korean text \"2026년 저소득층 교육 바우처 지원\".",
+      "imageUrl": "/generated/img_1769584621407_iuyc1i.jpg",
+      "status": "approved",
+      "subtitle": "2026년 저소득층 교육 바우처 지원",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584847528.wav",
+      "audioDuration": 11.571875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "2026년 교육 바우처는 생계, 의료, 주거, 교육 급여 수급 가구 및 차상위 계층 학생들에게 제공됩니다. 자세한 자격 요건을 확인하세요!",
+      "title": "자격 요건 확인",
+      "imagePrompt": "Anime style, Infographic chart showing eligibility criteria for the education voucher program. The chart includes bullet points explaining 생계, 의료, 주거, 교육 급여 수급 가구 and 차상위 계층. 여수시 로고 is at the top. Large Korean text \"자격 요건 확인\" in bold, infographic style. Below, smaller Korean text \"지원 대상 안내: 저소득층 기준\".",
+      "imageUrl": "/generated/img_1769584652895_69qe38.jpg",
+      "status": "approved",
+      "subtitle": "지원 대상 안내: 저소득층 기준",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584859485.wav",
+      "audioDuration": 13.091875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "바우처를 통해 직업기술, 기예, 예능 분야의 학원 수강료를 지원받을 수 있습니다. 꿈을 키우는 데 필요한 분야를 선택하세요.",
+      "title": "다양한 분야 지원",
+      "imagePrompt": "Anime style, A split-screen comparison showing various educational activities. One side depicts 직업기술 (e.g., computer programming), the other shows 기예, 예능 (e.g., music lesson). The title above reads \"다양한 분야 지원\". At the bottom, Korean text \"직업기술, 기예, 예능 분야 수강료 지원\" in bold, infographic style.",
+      "imageUrl": "/generated/img_1769584677559_tlnxn.jpg",
+      "status": "approved",
+      "subtitle": "직업기술, 기예, 예능 분야 수강료 지원",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584871388.wav",
+      "audioDuration": 11.171875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "2026년 2월 2일부터 2월 13일까지, 읍·면사무소 및 동 주민센터에서 신청하세요. 마감일을 놓치지 마세요!",
+      "title": "신청 기간 안내",
+      "imagePrompt": "Anime style, Step-by-step flow chart showing the application process for the education voucher. The steps include 서류 준비, 방문 접수 (읍·면사무소, 동 주민센터), and 결과 확인. The Korean text \"신청 기간 안내\" is prominently displayed. Below, Korean text \"2026년 2월 2일 ~ 2월 13일\" in bold, infographic style.",
+      "imageUrl": "/generated/img_1769584696614_fq6ftr.jpg",
+      "status": "approved",
+      "subtitle": "2026년 2월 2일 ~ 2월 13일",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584881902.wav",
+      "audioDuration": 11.011875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "수강료는 월 10만원 정액 지원되며, 바우처 카드에 포인트가 충전됩니다. 출석률 60% 이상을 유지해야 합니다.",
+      "title": "지원 금액 안내",
+      "imagePrompt": "Anime style, An infographic chart illustrating the voucher amount (10만원) and attendance requirement (60%). A voucher card with 여수시 로고 is shown. Large Korean text \"지원 금액 안내\" in bold, infographic style. Below, smaller Korean text \"월 10만원 정액 지원, 출석률 60% 이상\".",
+      "imageUrl": "/generated/img_1769584720965_blhpv.jpg",
+      "status": "approved",
+      "subtitle": "월 10만원 정액 지원, 출석률 60% 이상",
+      "duration": 12,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584890927.wav",
+      "audioDuration": 9.331875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "궁금한 점이 있으신가요? 평생교육과 061-659-4716으로 문의하세요.",
+      "title": "문의처 안내",
+      "imagePrompt": "Anime style, An image featuring a friendly operator answering a phone. The phone number 061-659-4716 is prominently displayed on the screen. The text \"문의처 안내\" is displayed in a large, bold font. Below, smaller Korean text \"평생교육과 061-659-4716\".",
+      "imageUrl": "/generated/img_1769584741009_5r8vmh.jpg",
+      "status": "approved",
+      "subtitle": "평생교육과 061-659-4716",
+      "duration": 10,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769584899060.wav",
+      "audioDuration": 7.771875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "aa2e95a1-adc6-49bd-bbf7-064f29dfa519",
+  "createdAt": "2026-01-28T07:24:19.250Z",
+  "videoPath": "/projects/aa2e95a1-adc6-49bd-bbf7-064f29dfa519/video.webm",
+  "thumbnailPath": "/projects/aa2e95a1-adc6-49bd-bbf7-064f29dfa519/thumbnail.jpg"
+}

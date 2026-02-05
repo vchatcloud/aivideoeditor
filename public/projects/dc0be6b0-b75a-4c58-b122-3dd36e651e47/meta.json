@@ -1,0 +1,82 @@
+{
+  "groupTitle": "2026년 성동구에서 공동시설 내 수목정비사업 공모를 진행합니다. 신청 기간은 2026년 1월 26일부터 2월 6일까지이며, 신청 방법은 직접 또는 우편 제출입니다. 제출 서류는 신청서와 사업합의서 각 1부이며, 결과는 2월 27일에 발표될 예정입니다. 자세한 사항은 공고문을 참조하십시오.",
+  "title": "2026년 성동구에서 공동시설 내 수목정비사업 공모를 진행합니다. 신청 기간은 2026년 1월 26일부터 2월 6일까지이며, 신청 방법은 직접 또는 우편 제출입니다. 제출 서류는 신청서와 사업합의서 각 1부이며, 결과는 2월 27일에 발표될 예정입니다. 자세한 사항은 공고문을 참조하십시오. - 1",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0.9322050000000001,
+    "imageCost": 290,
+    "audioCost": 0,
+    "totalCost": 290.932205
+  },
+  "scenes": [
+    {
+      "text": "2026년, 성동구는 안전한 환경 조성을 위해 공동시설 내 수목 정비 사업을 공모합니다. 참여를 희망하는 주민, 공동주택, 공공시설은 기한 내에 신청해주시기 바랍니다.",
+      "title": "수목정비사업 공모",
+      "imagePrompt": "Infographic chart with the title \"2026년 공동시설 수목 정비 사업 안내\" in bold Korean text at the top. The chart includes key details: Application Period: 2026년 1월 26일 ~ 2월 6일; Submission Method: 직접 또는 우편 제출; Place of Submission: 성동구청 공원녹지과. Include icons representing each category. A modern and clean layout.",
+      "imageUrl": "/generated/img_1769481873129_s2rji.jpg",
+      "status": "generated",
+      "subtitle": "2026년 공동시설 수목 정비 사업 안내",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "신청 기간은 2026년 1월 26일부터 2월 6일까지입니다. 잊지 마시고 꼭 기한 내에 신청하세요!",
+      "title": "신청 기간",
+      "imagePrompt": "Infographic step-by-step flow chart showing the application process. Step 1: '신청서 작성' (Application Form Preparation) with an icon of a pen and paper. Step 2: '제출 서류 준비' (Prepare Submission Documents) with an icon of documents. Step 3: '직접 또는 우편 제출' (Direct or Mail Submission) with icons for both. The title '신청 절차 안내' (Application Process Guide) in bold Korean text at the top. Clean and professional design.",
+      "imageUrl": "/generated/img_1769481897986_8a5u0c.jpg",
+      "status": "generated",
+      "subtitle": "2026년 1월 26일 ~ 2월 6일",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "제출 서류는 신청서와 사업합의서 각 1부입니다. 빠짐없이 준비하여 제출해주세요.",
+      "title": "제출 서류",
+      "imagePrompt": "Split screen comparison. Left side: Image of an application form with the Korean text '신청서' prominently displayed. Right side: Image of a business agreement form with the Korean text '사업합의서' prominently displayed. Title: '제출 서류 안내' in bold Korean text at the top. Professional and informative layout.",
+      "imageUrl": "/generated/img_1769481919720_zpxl9d.jpg",
+      "status": "generated",
+      "subtitle": "신청서, 사업합의서 각 1부",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "결과 발표는 2026년 2월 27일 금요일에 있을 예정입니다. 두근거리는 마음으로 결과를 기다려주세요!",
+      "title": "결과 발표 예정",
+      "imagePrompt": "Infographic timeline displaying key dates. Start: '공모 시작' (Application Start) - 2026년 1월 26일. End: '신청 마감' (Application Deadline) - 2026년 2월 6일. Result: '결과 발표' (Result Announcement) - 2026년 2월 27일. The title '주요 일정' (Key Dates) in bold Korean text at the top. Clean and visually appealing.",
+      "imageUrl": "/generated/img_1769481942701_dw0tutz.jpg",
+      "status": "generated",
+      "subtitle": "2026년 2월 27일 (금)",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "더 궁금한 점이 있으신가요? 성동구청 공원녹지과로 문의해주세요. 전화번호는 02-2286-5665입니다.",
+      "title": "문의처 안내",
+      "imagePrompt": "Infographic with the title '문의처 안내' (Contact Information) in bold Korean text at the top. Display the text: '성동구청 공원녹지과' (Seongdong-gu Office Park & Greenery Division) and '02-2286-5665' clearly. Include icons for location and phone. Clean and professional design.",
+      "imageUrl": "/generated/img_1769481966095_lzixgt.jpg",
+      "status": "generated",
+      "subtitle": "문의: 02-2286-5665",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "dc0be6b0-b75a-4c58-b122-3dd36e651e47",
+  "createdAt": "2026-01-27T02:48:22.943Z",
+  "videoPath": "/projects/dc0be6b0-b75a-4c58-b122-3dd36e651e47/video.webm",
+  "thumbnailPath": "/projects/dc0be6b0-b75a-4c58-b122-3dd36e651e47/thumbnail.jpg"
+}

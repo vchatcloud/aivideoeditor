@@ -1,0 +1,70 @@
+{
+  "groupTitle": "★★2026년 상반기 문주장학재단 AI·ICT 분야 인재 장학생 선발계획 공고★★",
+  "title": "★★2026년 상반기 문주장학재단 AI·ICT 분야 인재 장학생 선발계획 공고★★",
+  "duration": 20,
+  "usage": {
+    "scriptCost": 1.4502899999999999,
+    "imageCost": 0,
+    "audioCost": 0,
+    "totalCost": 1.4502899999999999
+  },
+  "scenes": [
+    {
+      "text": "문주장학재단은 미래를 이끌어갈 AI·ICT 분야의 인재를 발굴하고 지원하여 서초구의 혁신 성장을 돕고자 합니다. 2026년 1학기 등록금 전액을 지원하며, 총 30명의 장학생을 선발합니다. 혁신적인 미래를 향한 여정에 함께 해 주시기를 기대합니다.",
+      "title": "미래 인재 양성 지원",
+      "imagePrompt": "4k, hyper-realistic, cinematic lighting, professional photography, depth of field. Wide shot set in a modern, clean, cool blue-toned university library or high-tech lecture hall with minimalist background. A Korean female university student (20s, neat, white shirt and navy blazer) is sitting and looking intently at a glowing screen on the right side of the frame, symbolizing dedication and technology study. On the wide negative space on the left, embed a structured graphic infographic panel: Title \"장학생 모집 개요\" in bold Korean, listing two key facts below: 1. \"선발 규모: 30명\" and 2. \"지원 내용: 2026년 1학기 등록금 전액\" in crisp, bold Korean text. Cool blue tones dominate the scene, bright office lighting, clean, professional mood.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "AI·ICT 분야 등록금 전액 지원 (30명)",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "신청 자격은 공고일 기준 부모 또는 본인이 1년 이상 서초구에 주민등록이 되어 있는 AI·ICT 전공 대학생입니다. 특히 직전 학기 평점 B0(3.0/4.5) 이상, 최소 12학점을 이수한 2학년 이상 재학생이어야 합니다. 엄격한 기준으로 미래 인재를 공정하게 선발합니다.",
+      "title": "핵심 지원 자격 확인",
+      "imagePrompt": "4k, hyper-realistic, cinematic lighting, professional photography, depth of field. Wide shot set in a professional, bright office environment (representing the Seocho-gu office) with cool blue tones and a minimalist background. A focused Korean female university student (20s, neat, white shirt and navy blazer) is standing by a sleek glass wall on the right, reviewing a detailed digital document on a tablet. On the wide negative space on the left, embed a structured flowchart infographic panel titled \"필수 지원 자격\" in bold Korean. Include three key nodes/boxes in Korean: 1. \"서초구 거주 1년 이상 (본인/부모)\", 2. \"AI·ICT 전공 2학년 이상 재학생\", and 3. \"직전 학기 평점 3.0 이상 (B0)\". Bright office lighting, clean, professional mood.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "서초구 1년 이상 거주 및 평점 B0 이상 필수",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "접수 기간은 2026년 2월 23일 월요일부터 3월 6일 금요일까지입니다. 방문 접수는 서초구청 8층 교육지원과 교육정책팀으로, 평일 9시부터 18시 사이에 가능합니다(점심시간 제외). 마감일 소인 미인정 등기우편 접수도 가능하니, 기한을 엄수하여 주시기 바랍니다.",
+      "title": "접수 기간 및 방법 안내",
+      "imagePrompt": "4k, hyper-realistic, cinematic lighting, professional photography, depth of field. Wide shot of the clean, modern reception area of a government building (representing Seocho-gu Office 8th Floor) with cool blue tones. A Korean female university student (consistent character, blazer) is placing a document or a registered mail envelope into a designated intake slot or counter on the right side, focusing on the action. On the wide negative space on the left, embed a structured table/checklist infographic panel titled \"접수 방법 및 기한\" in bold Korean. Highlight the deadline \"2026년 3월 6일 (금)\" and the location \"서초구청 8층 교육지원과\" strictly in bold Korean Hangul. Bright office lighting, clean, professional mood.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "2026. 2. 23. (월) ~ 3. 6. (금) 마감",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "장학생은 학업성적 80%와 소득수준 20%를 합산한 고득점자 순으로 선발됩니다. 선발 결과는 3월 중 서초구청 홈페이지에 게시됩니다. 최종 선발된 장학생은 3월 31일 화요일 오후에 예정된 장학증서 수여식에 필수로 참여해야 합니다.",
+      "title": "공정한 선발 기준",
+      "imagePrompt": "4k, hyper-realistic, cinematic lighting, professional photography, depth of field. Wide shot in a formal, modern auditorium or conference room setting (award venue). The consistent Korean female university student character (blazer) is standing on the right, confidently receiving a symbolic light blue folder (representing the scholarship certificate) from an unseen official. The mood is hopeful yet professional, dominated by cool blue tones and bright light. On the wide negative space on the left, embed a split-screen infographic graphic titled \"선발 심사 비율\" in bold Korean, clearly showing \"학업 성적 80%\" and \"소득 수준 20%\" using a visualization (e.g., pie chart or stacked bars) in bold Korean text. Below this, state the mandatory participation date: \"장학증서 수여식: 2026. 3. 31. (화) 필참\" in Korean. Professional cinematic shot.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "성적 80% + 소득 20% 합산 심사",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "rec47Txn6tefbZC3B",
+  "createdAt": "2026-02-02T09:09:28.377Z",
+  "updatedAt": "2026-02-02T09:09:28.377Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

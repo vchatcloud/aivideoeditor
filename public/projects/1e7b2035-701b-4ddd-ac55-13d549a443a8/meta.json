@@ -1,0 +1,69 @@
+{
+  "groupTitle": "성동 푸르미 재활용정거장 미운영 알림（2026. 1. 22.（목） 미운영）NEW",
+  "title": "성동 푸르미 재활용정거장 미운영 알림（2026. 1. 22.（목） 미운영）NEW - 1",
+  "duration": 20,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 232,
+    "audioCost": 12.15,
+    "totalCost": 244.15
+  },
+  "scenes": [
+    {
+      "text": "2026년 1월 22일, 기록적인 한파로 인해 성동 푸르미 재활용정거장이 문을 닫습니다. 자원관리사들의 안전이 최우선입니다.",
+      "title": "한파 속 휴무",
+      "imagePrompt": "Anime style, Infographic Realism style, Public Service Announcement style, Realistic image of a closed 성동 푸르미 재활용정거장 on a very cold, snowy morning. A middle-aged Korean woman, wearing a thick winter coat and hat, is placing a sign on the gate. The sign reads \"2026. 1. 22. 미운영\" in bold Korean text. The scene emphasizes the harsh winter conditions with frost and snow. Focus on a realistic portrayal of the woman and the environment.",
+      "imageUrl": "/generated/img_1769054840924_0wt0cg.jpg",
+      "status": "approved",
+      "subtitle": "2026년 1월 22일, 성동 푸르미 재활용정거장",
+      "duration": 12,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769055082412.wav",
+      "audioDuration": 9.171875,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "기상청의 예보에 따르면, 영하 7도 이하의 강추위가 예상됩니다. 자원관리사분들의 건강을 위해 휴무를 결정했습니다.",
+      "title": "강추위 예보",
+      "imagePrompt": "Anime style, Infographic Realism style, Public Service Announcement style, Realistic infographic chart showing a weather forecast for Seoul on January 22, 2026. The chart includes a thermometer indicating -7 degrees Celsius. A warning sign about 한랭질환 (cold-related illnesses) is prominently displayed with bullet points explaining symptoms and prevention. The subtitle “영하 7도 이하, 한랭질환 주의” is embedded as bold graphic text within the infographic. The chart also includes the 청소행정과 (Cleaning Administration Department) contact number: 02-2286-5540.",
+      "imageUrl": "/generated/img_1769054861865_jh2kgb.jpg",
+      "status": "approved",
+      "subtitle": "영하 7도 이하, 한랭질환 주의",
+      "duration": 11,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769055092029.wav",
+      "audioDuration": 8.531875,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "재활용정거장 미운영 결정은 자원관리사분들의 안전을 위한 최선의 선택입니다.",
+      "title": "안전 최우선",
+      "imagePrompt": "Anime style, Infographic Realism style, Public Service Announcement style, Realistic split-screen comparison. On one side, a 자원관리사 (resource manager) is working in extremely cold conditions, shivering. On the other side, the same person is shown inside a warm break room, drinking hot tea. A bold Korean title reads \"안전 최우선\" (Safety First). The split-screen aims to highlight the importance of protecting the health of the workers.",
+      "imageUrl": "/generated/img_1769054880903_xkca9l.jpg",
+      "status": "approved",
+      "subtitle": "자원관리사 건강 보호",
+      "duration": 8,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769055099387.wav",
+      "audioDuration": 5.891875,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "향후 재활용정거장 운영에 변동이 있을 경우, 10시 이후에 미리 안내해 드리겠습니다. 항상 시민 여러분의 협조에 감사드립니다.",
+      "title": "사전 안내",
+      "imagePrompt": "Anime style, Infographic Realism style, Public Service Announcement style, Realistic step-by-step flow diagram showing the communication process for notifying citizens about changes to the recycling center schedule. Step 1: 기상청 일기예보 확인 (Check Weather Forecast). Step 2: 미운영 결정 (Closure Decision). Step 3: 오전 10시 이후 안내 (Notification After 10 AM). Step 4: 시민 협조 요청 (Request Citizen Cooperation). Each step includes a relevant icon and brief description in Korean. The subtitle “변동 시 10시 이후 안내” is embedded as bold graphic text in the flow diagram.",
+      "imageUrl": "/generated/img_1769054911540_cufgj.jpg",
+      "status": "approved",
+      "subtitle": "변동 시 10시 이후 안내",
+      "duration": 11,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769055109297.wav",
+      "audioDuration": 8.691875,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "1e7b2035-701b-4ddd-ac55-13d549a443a8",
+  "createdAt": "2026-01-27T09:19:33.110Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

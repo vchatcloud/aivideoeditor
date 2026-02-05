@@ -1,0 +1,42 @@
+{
+  "groupTitle": "취약계층을 위한 「우리동네 펫위탁소」 운영NEW",
+  "title": "취약계층을 위한 「우리동네 펫위탁소」 운영NEW - 5",
+  "duration": 10,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 116,
+    "audioCost": 0,
+    "totalCost": 116
+  },
+  "scenes": [
+    {
+      "text": "성동구 펫위탁소 운영 안내입니다.33333",
+      "title": "Intro",
+      "imagePrompt": "Korean social worker with dog",
+      "imageUrl": "/generated/img_3_1.jpg",
+      "status": "generated",
+      "subtitle": "펫위탁소 안내",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": false
+    },
+    {
+      "text": "취약계층 및 1인가구를 대상으로 합니다.44444",
+      "title": "Info",
+      "imagePrompt": "Elderly person with pet",
+      "imageUrl": "/generated/img_3_2.jpg",
+      "status": "generated",
+      "subtitle": "대상자 안내",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0
+    }
+  ],
+  "id": "cd325618-6985-446d-99b4-3bcd958ee27b",
+  "createdAt": "2026-01-23T06:53:56.733Z",
+  "videoPath": "/projects/cd325618-6985-446d-99b4-3bcd958ee27b/video.webm",
+  "thumbnailPath": "/projects/cd325618-6985-446d-99b4-3bcd958ee27b/thumbnail.jpg"
+}

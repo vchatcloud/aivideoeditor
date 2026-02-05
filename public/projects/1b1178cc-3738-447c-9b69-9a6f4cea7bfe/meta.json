@@ -1,0 +1,87 @@
+{
+  "groupTitle": "2026년 새일센터 경력단절예방지원사업 「잡(JOB)아라 내 꿈 !」 참여자 모집새로운글",
+  "title": "2026년 새일센터 경력단절예방지원사업 「잡(JOB)아라 내 꿈 !」 참여자 모집새로운글 - 1",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 290,
+    "audioCost": 18.5,
+    "totalCost": 308.5
+  },
+  "scenes": [
+    {
+      "text": "2026년, 경력 단절로 고민하는 여성들을 위한 특별한 기회가 여수에서 시작됩니다. 여성가족과와 함께 꿈을 '잡(JOB)아라 내 꿈 !' 프로그램에 참여하세요.",
+      "title": "기회 포착",
+      "imagePrompt": "Minimalist style, Modern Flat Design Infographic. A dynamic, stylized Korean title '잡(JOB)아라 내 꿈 !' dominating the screen. Below it, a clean timeline graphic indicating '2026년 사업 시작'. The main graphic uses icons representing career growth (a ladder, a growing plant) and features a consistent character (Ji-hye, early 30s female, smart-casual attire) looking determined. Use a professional, clean blue and yellow palette. Ensure all visible text is strictly in Korean (Hangul).",
+      "imageUrl": "/generated/img_1769586143194_azo39d.jpg",
+      "status": "approved",
+      "subtitle": "2026년 경력단절예방지원사업",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769586935756.wav",
+      "audioDuration": 13.251875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "프로그램은 2026년 2월 4일 수요일, 오후 1시부터 5시까지 총 4시간 동안 진행됩니다. 장소는 여수여성인력개발센터 4층 누리마루 강당입니다.",
+      "title": "프로그램 핵심 정보",
+      "imagePrompt": "Minimalist style, Split Screen Comparison Infographic layout. Left side titled '일 시' and right side '장 소', using bold Korean text. Left side shows a detailed clock icon and the embedded Korean subtitle text: '2026. 2. 4.(수) 13:00 ~ 17:00'. Right side shows a map pin icon pointing to a modern building, with embedded Korean text: '여수여성인력개발센터 4층 (누리마루 강당)'. The graphic must be professional and high-density, clearly showcasing the data in Korean.",
+      "imageUrl": "/generated/img_1769586449266_cbfewr.jpg",
+      "status": "approved",
+      "subtitle": "일시 및 장소 안내",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769586948240.wav",
+      "audioDuration": 13.731875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "이 프로그램은 여수 지역 내에서 취업이나 창업을 간절히 희망하는 모든 여성 구직자들을 대상으로 합니다. 당신의 새로운 시작을 응원합니다.",
+      "title": "참여 대상은?",
+      "imagePrompt": "Minimalist style, Infographic Chart focused on '대상'. A clean segmented chart or flow diagram titled '참여 대 상' in bold Korean. Segments are clearly labeled in Korean: '지역 내 여성', '구직자', '취·창업 희망자'. An icon representing a group of diverse professional women is included. The consistent character (Ji-hye) is shown networking confidently in a bright, modern setting. Emphasize clarity and structure, embedding the Korean text.",
+      "imageUrl": "/generated/img_1769586521882_zxgy6f.jpg",
+      "status": "approved",
+      "subtitle": "취·창업 희망 여성 구직자",
+      "duration": 13,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769586961974.wav",
+      "audioDuration": 10.731875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "참여를 위한 신청 방법은 매우 간단합니다. 직접 방문하거나, 전화, 또는 온라인으로 편리하게 접수할 수 있습니다.",
+      "title": "쉬운 신청 방법",
+      "imagePrompt": "Minimalist style, Step-by-Step Flow Infographic using three distinct bullet points, titled '신 청 방 법' in large, clear Korean font. Each step has an accompanying icon representing the method: 1. (House Icon) labeled '방 문 접 수', 2. (Phone Icon) labeled '전 화 접 수', 3. (Monitor Icon) labeled '온 라 인 접 수'. The subtitle text '방문 및 전화, 온라인접수' is prominently displayed as a flow header. Use a light background and bright icons.",
+      "imageUrl": "/generated/img_1769586555431_o6dxj.jpg",
+      "status": "approved",
+      "subtitle": "방문, 전화, 온라인 접수",
+      "duration": 12,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769586973128.wav",
+      "audioDuration": 9.931875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "프로그램에 대한 더 궁금한 점이 있다면 언제든지 문의해 주세요. 여수여성인력개발센터가 상세히 안내해 드립니다.",
+      "title": "문의 및 연락처",
+      "imagePrompt": "Minimalist style, Infographic Chart displaying contact details. A large, friendly speech bubble icon or contact card contains the main contact information. Titled '문 의 처' in Korean. Boldly embedded Korean text: '여수여성인력개발센터' and the phone number '☎ 061)641-0050'. A secondary administrative contact '담당부서: 여성가족과 (061-659-3745)' is also displayed in smaller, clear Korean font beneath the main contact block. The setting is the reception area of a bright development center.",
+      "imageUrl": "/generated/img_1769586593973_jfn69.jpg",
+      "status": "approved",
+      "subtitle": "여수여성인력개발센터 (061-641-0050)",
+      "duration": 11,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769587056578.wav",
+      "audioDuration": 8.651875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "1b1178cc-3738-447c-9b69-9a6f4cea7bfe",
+  "createdAt": "2026-01-28T08:04:00.531Z",
+  "videoPath": "/projects/1b1178cc-3738-447c-9b69-9a6f4cea7bfe/video.webm",
+  "thumbnailPath": "/projects/1b1178cc-3738-447c-9b69-9a6f4cea7bfe/thumbnail.jpg"
+}

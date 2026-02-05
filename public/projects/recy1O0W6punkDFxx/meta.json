@@ -1,0 +1,32 @@
+{
+  "groupTitle": "[보도참고] 식약처, '26년 의약품 소량포장 공급 대상 공고",
+  "title": "[보도참고] 식약처, '26년 의약품 소량포장 공급 대상 공고",
+  "duration": 5,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 0,
+    "audioCost": 0,
+    "totalCost": 0
+  },
+  "saveMemo": "메모2",
+  "scenes": [
+    {
+      "text": "식품의약품안전처는 국민의 안전과 의약품 접근성 향상을 위해 2026년도 소량포장 의약품 공급 대상 목록을 확정 공고했습니다. 이는 필수 의약품의 안정적 재고 관리를 목표로 합니다. 담당 부서인 의약품관리과에 문의하여 상세 내용을 확인하실 수 있습니다. 우리는 투명하고 신뢰할 수 있는 공공 서비스를 약속드립니다.",
+      "title": "의약품 공급 안정화 정책",
+      "imagePrompt": "4k, hyper-realistic professional photography, cinematic cool blue lighting, high depth of field, bright modern government regulatory office environment, clean, minimalist. Wide shot composition showing a spacious office. A professional Korean female official (late 30s, crisp navy suit) stands confidently on the far right. The center features a large, transparent digital display showing a structured infographic chart. Key Korean text elements are displayed prominently on the infographic screen in bold white Hangul: '식약처 주요 공고 (MFDS Key Announcement)', '공고일: 2026-02-03', and '문의: 의약품관리과 (043-719-2664)'. The left side is a wide area of clean, white negative space for text overlay.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "2026년도 식약처 소량포장 공급 대상 목록 공고",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "recy1O0W6punkDFxx",
+  "createdAt": "2026-02-03T02:16:24.732Z",
+  "updatedAt": "2026-02-03T02:16:24.732Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

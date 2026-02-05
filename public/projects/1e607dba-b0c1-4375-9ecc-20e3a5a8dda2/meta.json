@@ -1,0 +1,87 @@
+{
+  "groupTitle": "This photo essay documents the '2026년 식품의약품안전처 시무식' (2026 Ministry of Food and Drug Safety New Year's Kick-off Ceremony) held on January 2, 2026, capturing the speech by Commissioner Oh Yu-Kyoung, the audience, and interactions with staff, emphasizing a unified start to the new year.",
+  "title": "This photo essay documents the '2026년 식품의약품안전처 시무식' (2026 Ministry of Food and Drug Safety New Year's Kick-off Ceremony) held on January 2, 2026, capturing the speech by Commissioner Oh Yu-Kyoung, the audience, and interactions with staff, emphasizing a unified start to the new year. - 1",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0.78223875,
+    "imageCost": 290,
+    "audioCost": 17.6,
+    "totalCost": 308.38223875
+  },
+  "scenes": [
+    {
+      "text": "오유경 처장님이 신년사를 통해 2026년 식약처가 나아가야 할 방향과 비전을 제시하고 있습니다. 밝은 표정에서 새해에 대한 기대가 느껴집니다.",
+      "title": "2026년 새해 비전 선포",
+      "imagePrompt": "Watercolor style, High Quality Photo of Commissioner Oh Yu-Kyoung standing centrally behind a dark wooden podium bearing the MFDS logo, delivering a speech into a microphone. She is wearing dark attire and glasses, smiling. The background is a large, plain light beige wall and a wooden floor.",
+      "imageUrl": "/generated/img_1769651568506_gdp43b.jpg",
+      "status": "approved",
+      "subtitle": "오송보건의료행정타운",
+      "duration": 13,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769651922929.wav",
+      "audioDuration": 10.011875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "넓은 강당을 가득 채운 직원들이 신년 시무식에 집중하고 있습니다. 모두가 새로운 시작을 함께 축하하며 의지를 다지는 자리입니다.",
+      "title": "새해를 향한 열정",
+      "imagePrompt": "Watercolor style, High Quality Photo capturing a wide view of a large, tiered auditorium filled with attendees seated in blue chairs, facing a wooden stage. The stage is visible on the left, where a person in a dark suit is standing behind a podium, addressing the crowd. Overhead lights illuminate the scene, and the walls are paneled wood.",
+      "imageUrl": "/generated/img_1769651602834_gdop4k.jpg",
+      "status": "approved",
+      "subtitle": "후생관 대강당",
+      "duration": 12,
+      "transition": "slide",
+      "audioUrl": "/generated/audio/narration_1769651930988.wav",
+      "audioDuration": 9.011875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "시무식 현수막 아래, 처장님의 격려와 당부의 말씀이 울려 퍼집니다. 직원들은 박수로 화답하며 힘찬 새해를 다짐합니다.",
+      "title": "격려의 메시지",
+      "imagePrompt": "Watercolor style, High Quality Photo showing a speaker standing center stage behind a podium during an event. The stage features a Korean flag and another organizational flag. Above the stage is a large blue banner reading \"2026년 식품의약품안전처 시무식\". The foreground shows the backs of audience members seated in dark blue chairs, clapping.",
+      "imageUrl": "/generated/img_1769651645631_76wfhc.jpg",
+      "status": "approved",
+      "subtitle": "시무식 강연",
+      "duration": 12,
+      "transition": "slide",
+      "audioUrl": "/generated/audio/narration_1769651940285.wav",
+      "audioDuration": 9.891875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "시무식이 끝난 후, 직원들과의 따뜻한 악수와 인사를 나누는 모습입니다. 소통과 화합으로 함께 나아갈 2026년을 기대합니다.",
+      "title": "소통과 화합의 인사",
+      "imagePrompt": "Watercolor style, High Quality Photo depicting Commissioner Oh Yu-Kyoung, wearing a dark suit, smiling widely while shaking hands with a younger male employee in a dark sweater in a well-lit hallway. Another official in a suit stands slightly behind her, also smiling. The background features tiled gray walls and recessed lighting.",
+      "imageUrl": "/generated/img_1769651800121_hbrt79.jpg",
+      "status": "approved",
+      "subtitle": "직원과의 만남",
+      "duration": 12,
+      "transition": "slide",
+      "audioUrl": "/generated/audio/narration_1769651949632.wav",
+      "audioDuration": 9.331875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "주요 관계자들이 한자리에 모여 기념 촬영을 했습니다. 안전한 식약 환경 조성을 위해 헌신할 것을 다짐하는 단체 사진입니다.",
+      "title": "핵심 관계자 단체 사진",
+      "imagePrompt": "Watercolor style, High Quality Photo showing a large group of approximately twenty officials, both male and female, dressed in suits and professional attire, standing shoulder-to-shoulder on the stage beneath the \"2026년 식품의약품안전처 시무식\" banner. They are posing formally, some clapping. The foreground shows multiple rows of empty blue auditorium seats.",
+      "imageUrl": "/generated/img_1769651745877_3bzu4.jpg",
+      "status": "approved",
+      "subtitle": "2026년 다짐",
+      "duration": 11,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769651957891.wav",
+      "audioDuration": 8.811875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "1e607dba-b0c1-4375-9ecc-20e3a5a8dda2",
+  "createdAt": "2026-01-29T02:02:03.125Z",
+  "videoPath": "/projects/1e607dba-b0c1-4375-9ecc-20e3a5a8dda2/video.webm",
+  "thumbnailPath": "/projects/1e607dba-b0c1-4375-9ecc-20e3a5a8dda2/thumbnail.jpg"
+}

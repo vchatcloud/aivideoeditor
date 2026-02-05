@@ -1,0 +1,101 @@
+{
+  "groupTitle": "[보도참고] 식약처, 어린이집·유치원 노로바이러스 예방 위생관리 당부",
+  "title": "[보도참고] 식약처, 어린이집·유치원 노로바이러스 예방 위생관리 당부 - 1",
+  "duration": 30,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 348,
+    "audioCost": 28.300000000000004,
+    "totalCost": 376.3
+  },
+  "scenes": [
+    {
+      "text": "겨울철 흔한 식중독인 노로바이러스는 특히 단체 생활을 하는 어린이집과 유치원에서 쉽게 확산됩니다. 식약처는 감염 예방을 위해 철저한 위생 수칙 준수를 강조했습니다.",
+      "title": "노로바이러스 경보",
+      "imagePrompt": "Anime style, A professional infographic titled '노로바이러스 경보' (in bold Korean text) displayed at the top. The layout is a structured vertical split screen comparison. The left side uses a stylized, authoritative icon representing MFDS (식약처). The right side features a flat vector illustration of several children playing in a clean Korean classroom setting, overlaid with a giant, stylized Norovirus particle . icon that is visually crossed out in red. Use clear, structured boxes and labels emphasizing '어린이집' and '유치원' in Korean Hangul.\nWide landscape 16:9 aspect ratio (1920x1080 resolution)",
+      "imageUrl": "/generated/img_1769657479257_na5rh9.jpg",
+      "status": "approved",
+      "subtitle": "어린이집/유치원 위생관리 당부 (식약처)",
+      "duration": 17,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657630880.wav",
+      "audioDuration": 14.931875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "노로바이러스 예방의 가장 기본은 올바른 손 씻기입니다. 흐르는 물에 비누를 사용하여 30초 이상 깨끗이 씻어야 합니다. 특히 화장실 사용 후, 식사 준비 전후에 필수입니다.",
+      "title": "예방 수칙 1단계",
+      "imagePrompt": "Anime style, A detailed, step-by-step vector infographic demonstrating the proper handwashing technique. The title '올바른 손 씻기 생활화' is prominently displayed in bold Korean typography. The graphic uses a sequential flow of 5 distinct vector icons showing the stages of handwashing (palms, back of hands, fingers, thumbs, wrists). The critical duration '30초 이상' and the instruction '비누 사용' must be clearly embedded as Korean text labels next to the relevant steps within the structured graphic layout.",
+      "imageUrl": "/generated/img_1769656916815_h482i8.jpg",
+      "status": "approved",
+      "subtitle": "올바른 손 씻기 생활화",
+      "duration": 19,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657644313.wav",
+      "audioDuration": 16.651875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "노로바이러스는 오염된 물이나 익히지 않은 음식(특히 굴 같은 어패류)을 통해서도 감염됩니다. 모든 식재료는 85°C 이상에서 1분 이상 완전히 익혀야 하며, 물은 반드시 끓여 마셔야 합니다.",
+      "title": "음식 및 물 관리",
+      "imagePrompt": "Anime style, A clean, data-driven flat vector infographic utilizing a Split Screen Comparison chart layout. The left chart is labeled '음식 안전' (Food Safety) in Korean, showing a stylized image of shellfish ('굴' written in small Korean text label) crossed out, contrasting with a cooking thermometer icon clearly labeled with the temperature '85°C 이상' in Korean. The right chart is labeled '물 관리' (Water Management), showing a clean water glass next to an icon representing boiling water. All descriptive text is minimal and embedded as Korean labels within the charts.",
+      "imageUrl": "/generated/img_1769656947393_g9tsxb.jpg",
+      "status": "approved",
+      "subtitle": "안전한 식재료 사용",
+      "duration": 20,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657658956.wav",
+      "audioDuration": 17.211875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "감염자가 발생했을 경우, 구토물이나 설사가 묻은 물품이나 장소는 신속하게 소독해야 합니다. 락스(염소계 소독제)를 사용하여 주변 환경을 철저히 닦고 소독하며, 장갑과 마스크를 착용하고 처리해야 합니다.",
+      "title": "환경 소독",
+      "imagePrompt": "Anime style, A process flow infographic detailing environmental disinfection procedures. The main title '구토물 발생 시 대처' is displayed prominently. The structure is a vertical flow diagram using clear arrows and icons. Steps include wearing protection (represented by mask and glove icons), cleaning, and sanitizing. Key Korean instruction text embedded: '염소계 소독제 사용' and '장갑 및 마스크 착용'.\nWide landscape 16:9 aspect ratio (1920x1080 resolution)",
+      "imageUrl": "/generated/img_1769657534158_7q05fq.jpg",
+      "status": "approved",
+      "subtitle": "구토물 발생 시 대처",
+      "duration": 19,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657672045.wav",
+      "audioDuration": 16.091875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "위생관리 및 식중독 발생 관련 문의는 식약처 식중독예방과로 연락 주시기 바랍니다. 신속하고 정확한 정보 공유가 확산을 막는 핵심입니다.",
+      "title": "중요 연락처",
+      "imagePrompt": "Anime style, A bold typographic poster design styled as a professional contact card. The layout focuses heavily on clear, structured text. Prominent Korean text includes '식약처 식중독 예방과' and '문의 전화' (Inquiry Phone). The actual phone number, '043-719-2107,' must be displayed in a large, bold, centered Korean font within a dedicated rectangular graphic element featuring a phone icon.",
+      "imageUrl": "/generated/img_1769657001866_kx567.jpg",
+      "status": "approved",
+      "subtitle": "식중독 예방과 담당",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657758730.wav",
+      "audioDuration": 11.771875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "우리 아이들의 건강을 지키기 위한 노로바이러스 예방 수칙은 어렵지 않습니다. 오늘부터 시설 전체가 위생 관리를 철저히 하여 안전한 보육 환경을 조성합시다.",
+      "title": "안전한 환경 만들기",
+      "imagePrompt": "Anime style, A summarizing infographic chart structure. The visual uses three large, unified vector icons representing the key pillars of prevention: Handwashing, Cooking, and Cleaning. The overall visual summarizes the data-driven message. The central theme '철저한 위생 관리' (Thorough Hygiene Management) is emphasized in large, bold Korean typography at the bottom. A professional, friendly Korean female teacher (30s, wearing a light blue uniform) is depicted giving a positive gesture next to the summary chart.",
+      "imageUrl": "/generated/img_1769657029270_y3nj6a.jpg",
+      "status": "approved",
+      "subtitle": "지금 바로 실천하세요!",
+      "duration": 15,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769657769921.wav",
+      "audioDuration": 12.251875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "366a0c74-a2f6-4cdd-8602-55c34d649e70",
+  "createdAt": "2026-01-29T04:49:20.019Z",
+  "videoPath": "/projects/366a0c74-a2f6-4cdd-8602-55c34d649e70/video.webm",
+  "thumbnailPath": "/projects/366a0c74-a2f6-4cdd-8602-55c34d649e70/thumbnail.jpg"
+}

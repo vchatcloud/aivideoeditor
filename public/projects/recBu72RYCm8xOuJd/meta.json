@@ -1,0 +1,44 @@
+{
+  "groupTitle": "사회적경제 온라인 쇼핑몰 <함께누리> 설 기획전(30% 할인)",
+  "title": "사회적경제 온라인 쇼핑몰 <함께누리> 설 기획전(30% 할인)",
+  "duration": 10,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 116,
+    "audioCost": 0,
+    "totalCost": 116
+  },
+  "scenes": [
+    {
+      "text": "서울시가 운영하는 공공 온라인 쇼핑몰 '함께누리'는 사회적경제기업의 성장을 지원하는 중요한 플랫폼입니다. 이번 설을 맞아, 함께누리는 고객들에게 풍성한 혜택을 제공하는 특별 기획전을 마련했습니다. 이 기획전을 통해 사회적기업, 마을기업 등 가치 있는 상품들을 최대 30% 할인된 가격으로 만나볼 수 있습니다. 소비자는 좋은 상품을 합리적인 가격에 구매하면서 동시에 사회적 가치를 실현하는 착한 소비에 동참할 수 있습니다. 함께누리몰(www.hknuri.co.kr)에서 따뜻한 설 명절을 준비해 보세요.",
+      "title": "함께누리 설 기획전",
+      "imagePrompt": "A corporate Memphis style vector infographic. Composition is a wide shot with a clean, professional Korean woman (Minji) on the right, wearing a light blue blazer. On the left is a structured graphic panel with cool blue and white colors. The graphic prominently displays bold Korean text '최대 30% 할인 (Maximum 30% Discount)' and a stylized shopping cart icon. Below this, a flow chart indicates '사회적경제기업 지원 (Support for Social Economy Enterprises)' leading to '착한 소비 (Ethical Consumption)'. The URL 'www.hknuri.co.kr' is displayed minimally at the bottom. Minimalist background in cool blue tones, flat design.",
+      "imageUrl": "/projects/recBu72RYCm8xOuJd/images/img_1770260161491_w4jmzf.jpg",
+      "status": "approved",
+      "subtitle": "최대 30% 할인! 착한 소비로 사회적 가치를 함께 나눠요.",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "함께누리몰에 입점한 기업들은 서울시 사회적경제 생태계를 이루는 핵심 주체들입니다. 이들은 단순히 이윤 추구를 넘어 사회적 목적을 우선하며 지역사회에 기여합니다. 주요 입점 기업으로는 사회적기업, 마을기업, 협동조합이 있으며, 더 나아가 장애인기업과 여성기업 등 사회적 약자의 자립을 돕는 기업들도 포함됩니다. 함께누리는 이들 기업에게 안정적인 판로를 제공함으로써 지속 가능한 성장을 돕고, 서울시의 다양한 사회적경제 소식을 전달하는 창구 역할도 수행합니다. 구매를 통해 이들의 활동을 응원해 주세요.",
+      "title": "함께누리, 사회적경제 파트너",
+      "imagePrompt": "A flat design vector illustration in corporate Memphis style, structured as a detail infographic. A split-screen composition. The right side features the professional Korean woman (Minji) standing near geometric icons. The left side is dominated by a structured bar chart infographic detailing the types of supported enterprises. Four distinct columns or boxes are clearly labeled in bold Korean text: '사회적기업', '마을기업', '협동조합', and '장애인기업/여성기업'. Each label is associated with a minimal corresponding icon. The background uses clean white and cool blue gradients, adhering to the wide shot and minimal aesthetic.",
+      "imageUrl": "/projects/recBu72RYCm8xOuJd/images/img_1770260214080_jt5s78.jpg",
+      "status": "approved",
+      "subtitle": "사회적기업, 마을기업, 협동조합, 장애인/여성기업을 응원합니다.",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "recBu72RYCm8xOuJd",
+  "createdAt": "2026-02-05T08:28:33.528Z",
+  "updatedAt": "2026-02-05T08:28:33.528Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

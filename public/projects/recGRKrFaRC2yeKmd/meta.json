@@ -1,0 +1,33 @@
+{
+  "groupTitle": "Untitled Project",
+  "title": "Untitled Project",
+  "description": "",
+  "duration": 5,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 58,
+    "audioCost": 0,
+    "totalCost": 58
+  },
+  "saveMemo": "",
+  "scenes": [
+    {
+      "text": "서초구는 식품위생 감시체계를 효율화하고 시민들에게 안전한 먹거리를 제공하기 위해 2026년 소비자식품위생감시원 교육을 실시합니다. 주·야간 및 시니어 감시원까지 참석하여 식품 안전 관리 정책 방향, 위해 식품 식별 요령 등 전문 지식을 습득하게 됩니다. 구민의 건강과 직결된 중요한 임무인 만큼, 이번 교육을 통해 감시원들의 역할을 더욱 내실화하여 구민 신뢰를 높이는 계기가 될 것입니다.",
+      "title": "2026 감시원 전문성 강화",
+      "imagePrompt": "4k, hyper-realistic, cinematic lighting, professional photography, depth of field. Wide shot composition. A focused, professional Korean woman in her late 30s, dressed in a sharp navy blazer and white blouse, stands on the right, looking confidently at the viewer. She is positioned in a modern, cool blue-toned government auditorium under bright office lighting. On the left, covering wide negative space, a holographic infographic screen floats, displaying the schedule details. The infographic is minimalist and uses white and bright blue text. The main title on the infographic is bold Hangul: '2026년 정기 교육 일정'. Below the title, the key details '6월, 11월 (총 2회)' and '장소: 서초구청 2층 대강당' are clearly displayed as structured graphic text, strictly in Korean. The background is minimalist, clean, and professional, emphasizing regulation and competence. Cool blue tones dominate the scene.",
+      "imageUrl": "/projects/rec5lUf7h8dktKxIv/images/img_1770190186969_0yeqs.jpg",
+      "status": "approved",
+      "subtitle": "교육 일시: 2026년 6월, 11월 (총 2회) / 장소: 서초구청 2층 대강당",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "recGRKrFaRC2yeKmd",
+  "createdAt": "2026-02-05T02:26:13.411Z",
+  "updatedAt": "2026-02-05T02:26:13.411Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

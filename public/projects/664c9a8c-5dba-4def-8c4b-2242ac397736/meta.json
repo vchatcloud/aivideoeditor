@@ -1,0 +1,83 @@
+{
+  "groupTitle": "식품의약품안전처(식약처)는 2026년 1월 29일, 어린이집과 유치원을 대상으로 노로바이러스 식중독 예방을 위한 철저한 위생관리를 당부했다. 특히 겨울철에 유행하며 전파력이 강한 노로바이러스는 영유아 집단시설에서 더욱 주의가 필요하며, 손 씻기, 음식물 익혀 먹기, 조리 기구 소독 등 핵심 예방 수칙 준수가 중요함을 강조한다.",
+  "title": "식품의약품안전처(식약처)는 2026년 1월 29일, 어린이집과 유치원을 대상으로 노로바이러스 식중독 예방을 위한 철저한 위생관리를 당부했다. 특히 겨울철에 유행하며 전파력이 강한 노로바이러스는 영유아 집단시설에서 더욱 주의가 필요하며, 손 씻기, 음식물 익혀 먹기, 조리 기구 소독 등 핵심 예방 수칙 준수가 중요함을 강조한다.",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 0.9425362499999999,
+    "imageCost": 290,
+    "audioCost": 0,
+    "totalCost": 290.94253625
+  },
+  "scenes": [
+    {
+      "text": "식약처는 2026년 1월 29일, 어린이집과 유치원의 집단 식중독 위험에 대비해 철저한 위생관리를 당부했습니다. 특히 전파력이 강한 노로바이러스는 영유아 시설에서 더욱 주의가 필요합니다.",
+      "title": "긴급 경고",
+      "imagePrompt": "Anime style, A modern, high-contrast infographic poster titled '노로바이러스 경고' (Norovirus Warning). The layout is a dynamic vector art split screen comparing a stylized icon of a healthy child versus a sick child inside a kindergarten setting. Embed the subtitle '겨울철 노로바이러스 식중독 예방 수칙' prominently at the top. Use bold, geometric vector icons representing a daycare building and an abstract virus particle, highlighting the high risk in collective settings. Professional flat design using blue, green, and a cautionary red for emphasis. Strictly embed all display text in Korean (Hangul).",
+      "imageUrl": "/generated/img_1769672620264_u0r8hf.jpg",
+      "status": "approved",
+      "subtitle": "겨울철 노로바이러스 식중독 예방 수칙",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "노로바이러스 예방의 가장 기본이자 중요한 수칙입니다. 특히 화장실 사용 후, 기저귀 교체 후, 식사 전후, 조리 시작 전에 반드시 비누를 이용해 30초 이상 씻어야 합니다.",
+      "title": "제1수칙: 30초 손 씻기",
+      "imagePrompt": "Anime style, A detailed step-by-step flow chart infographic demonstrating the proper 7 steps of handwashing using clean, flat vector illustrations. The central header is '30초 손 씻기 방법' (30 Second Hand Washing Method). Key step descriptions like '손바닥', '손등', '손가락 사이' are labeled clearly in Korean next to corresponding hand icons. Embed the subtitle '비누를 사용하여 흐르는 물에 30초 이상 깨끗이 씻기' as the central mandate text in a large, bold font. Focus on a hygiene green and clean white color palette.",
+      "imageUrl": "/generated/img_1769672628395_0ekl9p.jpg",
+      "status": "approved",
+      "subtitle": "비누를 사용하여 흐르는 물에 30초 이상 깨끗이 씻기",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "굴 등 어패류나 오염된 지하수는 노로바이러스 감염의 주요 원인입니다. 모든 음식물은 완전히 익혀서 제공하고, 식수는 반드시 끓여서 사용해야 합니다.",
+      "title": "음식물 안전 관리",
+      "imagePrompt": "Anime style, A structured infographic chart focusing on critical food temperatures and preparation. Two main sections feature clear vector icons: 1. Water safety (icon of a boiling kettle) labeled '물 끓여 마시기'. 2. Food safety (icon of a cooking pot and digital thermometer). A large, bold data point displays '85°C, 1분 이상' in Korean, indicating required cooking temperature/time for safety. The subtitle '물은 끓여 마시고, 음식은 중심부까지 85°C에서 1분 이상 익히기' serves as the primary instructional header. Use professional vector art with a focus on informational hierarchy.",
+      "imageUrl": "/generated/img_1769672625639_cs9uks.jpg",
+      "status": "approved",
+      "subtitle": "물은 끓여 마시고, 음식은 중심부까지 85°C에서 1분 이상 익히기",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "칼, 도마 등 조리 기구는 사용 후 깨끗이 세척하고 소독해야 합니다. 특히 환자가 구토한 장소나 사용한 물품은 염소 소독제를 이용하여 철저히 소독해야 합니다.",
+      "title": "조리 기구 소독",
+      "imagePrompt": "Anime style, A visual comparison infographic (Split Screen Comparison) illustrating the necessity of disinfection in a daycare kitchen environment. Show vector representations of dirty surfaces (red X) and clean surfaces (green check). A prominent icon displays a bottle of disinfectant solution. The exact concentration '염소 소독제 (1,000ppm)' is displayed clearly in a statistical data box using bold Korean typography. The subtitle '사용한 물품은 염소 소독제(1,000ppm)로 철저히 소독 및 관리' is embedded as the core cleaning instruction label.",
+      "imageUrl": "/generated/img_1769672634296_j6cy9n.jpg",
+      "status": "approved",
+      "subtitle": "사용한 물품은 염소 소독제(1,000ppm)로 철저히 소독 및 관리",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "어린이집/유치원 직원이 설사, 구토 등 노로바이러스 증상을 보일 경우, 즉시 업무에서 배제하고 회복 후 2~3일이 지나야 복귀해야 합니다. 궁금한 사항은 식중독예방과(담당자 한정아, 043-719-2107)로 문의하세요.",
+      "title": "환자 관리 및 문의",
+      "imagePrompt": "Anime style, An icon-heavy, professional infographic panel dedicated to emergency protocol and contact information. Show clear vector icons representing immediate isolation ('격리 아이콘') and mandatory reporting. A prominent communication icon displays the specific contact number '043-719-2107' next to the title '식중독예방과' (Food Poisoning Prevention Division) in bold Korean text. The subtitle '증상 발생 시 즉시 격리 및 식중독예방과 (043-719-2107) 연락' is the central call-to-action block. Flat vector style, emphasizing clear typography and organizational structure.",
+      "imageUrl": "/generated/img_1769672642778_tj60xa.jpg",
+      "status": "approved",
+      "subtitle": "증상 발생 시 즉시 격리 및 식중독예방과 (043-719-2107) 연락",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "664c9a8c-5dba-4def-8c4b-2242ac397736",
+  "createdAt": "2026-01-29T07:57:31.791Z",
+  "updatedAt": "2026-01-29T07:57:31.791Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

@@ -1,0 +1,60 @@
+export async function resampleBuffer(
+    audioCtx: AudioContext,
+    buffer: AudioBuffer,
+    rate: number
+): Promise<AudioBuffer> {
+    if (rate === 1.0) return buffer;
+
+    // Calculate new length
+    const newLength = Math.round(buffer.length / rate);
+    
+    // OfflineAudioContext for high-quality resampling
+    const offlineCtx = new OfflineAudioContext(
+        buffer.numberOfChannels,
+        newLength,
+        buffer.sampleRate
+    );
+
+    const source = offlineCtx.createBufferSource();
+    source.buffer = buffer;
+    source.playbackRate.value = rate;
+    source.connect(offlineCtx.destination);
+    source.start(0);
+
+    return await offlineCtx.startRendering();
+}
+
+/**
+ * Pitch Shift Algorithm
+ * Changes pitch by `semitones` without affecting speed.
+ * Method: Resample (Speed+Pitch change) -> Time-Stretch (Restore Speed).
+ */
+export async function shiftPitch(
+    audioCtx: AudioContext,
+    buffer: AudioBuffer,
+    semitones: number
+): Promise<AudioBuffer> {
+    if (semitones === 0) return buffer;
+    
+    // 1. Calculate rate change for pitch shift
+    // +12 semitones = 2.0x frequency
+    const rate = Math.pow(2, semitones / 12);
+
+    // 2. Resample: Changes Pitch AND Duration
+    // Example: +12st (2.0x). Audio plays 2x faster, 0.5x duration. Pitch is 2x.
+    const resampled = await resampleBuffer(audioCtx, buffer, rate);
+
+    // 3. Time Stretch: Restore original Duration
+    // We want to stretch it BACK to original length.
+    // Current duration factor is (1/rate). We want factor 1.0.
+    // So we need to stretch by (Original / Current) = 1.0 / (1/rate) = rate?
+    // Wait. stretchAudio(buffer, speed)
+    // If speed > 1.0, it becomes shorter.
+    // If we have 0.5s audio (was 1s), and we want 1s.
+    // We need to play it at 0.5x speed (stretch factor 2.0). 
+    // stretchAudio param is "speed". 
+    // 0.5x speed means duration increases by 2.
+    // So we invoke stretchAudio(ctx, resampled, 1/rate).
+    
+    return await stretchAudio(audioCtx, resampled, 1 / rate);
+}

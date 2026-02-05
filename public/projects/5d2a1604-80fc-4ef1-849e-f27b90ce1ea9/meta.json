@@ -1,0 +1,73 @@
+{
+  "groupTitle": "식약처, 2025년도 정부업무평가에서 우수기관 선정",
+  "title": "식약처, 2025년도 정부업무평가에서 우수기관 선정 - 2",
+  "duration": 20,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 232,
+    "audioCost": 17.950000000000003,
+    "totalCost": 249.95
+  },
+  "scenes": [
+    {
+      "text": "식품의약품안전처가 2025년 정부업무평가에서 혁신과 효율성을 인정받아 '우수기관'으로 선정되는 쾌거를 이루었습니다. 이는 국민 안전과 행정 효율화에 대한 지속적인 노력의 결과입니다.",
+      "title": "2025년 정부업무평가",
+      "imagePrompt": "A clean, professional Infographic Chart demonstrating governmental achievement. The scene features a stylized golden trophy or a large star icon next to a bold graphic text banner strictly in Korean reading '식약처, 우수기관 선정!' (MFDS, Selected as Excellent Institution!). Below this, a smaller Korean text label reads '2025년 정부업무평가' (2025 Government Performance Evaluation). A professional female government official (30s, crisp blazer, ID badge) stands proudly next to the chart, pointing to the achievement, set in a bright, modern government office hall. Use a professional blue and white color palette.",
+      "imageUrl": "/generated/img_1769653665228_qqp2d.jpg",
+      "status": "approved",
+      "subtitle": "식약처, 우수기관 선정!",
+      "duration": 20,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769653977285.wav",
+      "audioDuration": 17.131875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "정부업무평가는 기관의 정책 성과, 효율성, 그리고 국민 만족도를 종합적으로 판단하는 중요한 지표입니다. 식약처는 이 평가에서 높은 점수를 획득하며 그 역량을 입증했습니다.",
+      "title": "평가의 중요성",
+      "imagePrompt": "A detailed Split Screen Comparison Infographic illustrating evaluation criteria. The left panel is titled '정책 성과' (Policy Performance) and shows bar charts trending upwards, featuring strict Korean text bullet points about efficiency metrics. The right panel is titled '국민 만족도' (Citizen Satisfaction) and shows a large checkmark icon and positive feedback graphs. The central connecting element is labeled in Korean: '핵심 평가 기준' (Key Evaluation Standard). The layout emphasizes data-driven results in a minimalist, corporate style.",
+      "imageUrl": "/generated/img_1769653701648_hqqcgp.jpg",
+      "status": "approved",
+      "subtitle": "정책 성과 & 국민 만족도",
+      "duration": 17,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769653989422.wav",
+      "audioDuration": 14.891875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "이번 성과를 이끌어낸 주역은 혁신행정담당관 부서입니다. 이들은 행정 프로세스 개선과 디지털 혁신을 통해 기관의 업무 효율성을 극대화하는 데 기여했습니다.",
+      "title": "성과를 만든 주역",
+      "imagePrompt": "A professional Step-by-Step Flow Infographic focusing on the responsible department. A central stylized icon representing innovation (a lightbulb or gear) is prominently labeled in bold Korean text: '혁신행정담당관' (Innovation Administration Officer). Arrows flow outwards to smaller Korean labels describing '업무 효율 극대화' (Maximize Work Efficiency) and '디지털 혁신' (Digital Innovation). The consistent female character (wearing a blazer and ID badge) is seen supervising a digital dashboard related to performance metrics within a modern, well-lit office setting.",
+      "imageUrl": "/generated/img_1769653726360_t19ka.jpg",
+      "status": "approved",
+      "subtitle": "혁신행정담당관",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769653999814.wav",
+      "audioDuration": 13.011875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "2026년 1월 28일에 등록된 이 우수기관 선정 소식에 대해 더 궁금한 점이 있으시면, 담당자 김현아 또는 소담이에게 연락 주시면 됩니다.",
+      "title": "자세한 문의 안내",
+      "imagePrompt": "A professional Contact Card Infographic. The scene features two clear, structured contact bubbles labeled strictly in Korean: one for '담당자 김현아' (Contact Kim Hyun-a) and one for '담당자 소담이' (Contact Sodami). Below these, a distinct footer area is reserved for the essential administrative details, featuring large, embedded Korean text: '전화 043-719-1461' (Phone 043-719-1461) and '등록일 2026-01-28' (Registration Date 2026-01-28). The visual theme is consistent with an organized, data-driven government announcement.",
+      "imageUrl": "/generated/img_1769653751077_fxsckh.jpg",
+      "status": "approved",
+      "subtitle": "등록일 2026-01-28 / 전화 043-719-1461",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1769654010578.wav",
+      "audioDuration": 11.011875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "5d2a1604-80fc-4ef1-849e-f27b90ce1ea9",
+  "createdAt": "2026-01-29T04:56:56.891Z",
+  "videoPath": "/projects/5d2a1604-80fc-4ef1-849e-f27b90ce1ea9/video.webm",
+  "thumbnailPath": "/projects/5d2a1604-80fc-4ef1-849e-f27b90ce1ea9/thumbnail.jpg"
+}
