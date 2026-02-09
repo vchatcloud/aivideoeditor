@@ -1,27 +1,25 @@
 {
   "groupTitle": "제60회 여수거북선축제 추진위원회 위촉식",
   "title": "제60회 여수거북선축제 추진위원회 위촉식",
-  "description": "",
-  "duration": 50,
+  "duration": 125.79875,
   "usage": {
     "scriptCost": 0,
     "imageCost": 0,
     "audioCost": 33.25000000000001,
     "totalCost": 33.25000000000001
   },
-  "saveMemo": "",
   "scenes": [
     {
-      "text": "제60회 여수거북선축제 추진위원회 위촉식에 오신 위원님들을 진심으로 환영합니다. 축제의 성공을 위한 첫 만남, 따뜻한 악수로 시작합니다.",
-      "title": "환영의 악수",
-      "imagePrompt": "[Original Photo Used] A formal indoor setting where a man in a dark navy suit, presumably a high official, warmly shakes hands with a committee member across a long meeting table. Other formally dressed attendees are standing and observing the handshake. The room has light wood paneled walls.",
-      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145.jpg",
+      "text": "축제 추진을 위한 위원들의 결속을 다지는 중요한 자리입니다. 모든 위원들이 경청하며 축제의 성공을 기원합니다.",
+      "title": "축제의 힘찬 출발",
+      "imagePrompt": "[Original Photo Used] A slightly angled wide shot of the indoor meeting. Participants are seated around long tables in a horseshoe configuration, listening intently to a speaker standing at a podium on the far left of the frame. The room has bright lighting and light wood accents.",
+      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145_2.jpg",
       "status": "pending",
-      "subtitle": "위촉식 시작",
-      "duration": 14,
+      "subtitle": "집중하는 위원들",
+      "duration": 10,
       "transition": "fade",
-      "audioUrl": "/generated/audio/narration_1770170945516.wav",
-      "audioDuration": 11.251875,
+      "audioUrl": "/generated/audio/narration_1770170964231.wav",
+      "audioDuration": 7.491875,
       "isEnabled": true,
       "isAudioGenerating": false
     },
@@ -36,20 +34,6 @@
       "transition": "fade",
       "audioUrl": "/generated/audio/narration_1770170956644.wav",
       "audioDuration": 9.971875,
-      "isEnabled": true,
-      "isAudioGenerating": false
-    },
-    {
-      "text": "축제 추진을 위한 위원들의 결속을 다지는 중요한 자리입니다. 모든 위원들이 경청하며 축제의 성공을 기원합니다.",
-      "title": "축제의 힘찬 출발",
-      "imagePrompt": "[Original Photo Used] A slightly angled wide shot of the indoor meeting. Participants are seated around long tables in a horseshoe configuration, listening intently to a speaker standing at a podium on the far left of the frame. The room has bright lighting and light wood accents.",
-      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145_2.jpg",
-      "status": "pending",
-      "subtitle": "집중하는 위원들",
-      "duration": 10,
-      "transition": "fade",
-      "audioUrl": "/generated/audio/narration_1770170964231.wav",
-      "audioDuration": 7.491875,
       "isEnabled": true,
       "isAudioGenerating": false
     },
@@ -96,6 +80,20 @@
       "isAudioGenerating": false
     },
     {
+      "text": "축제 성공을 향한 추진위원들의 진지하고 열정적인 자세가 사진 속에서 고스란히 전해집니다. 모두가 한마음으로 축제를 준비합니다.",
+      "title": "추진위원들의 열정",
+      "imagePrompt": "[Original Photo Used] A side-angle view showing a row of formally dressed men and women seated along a meeting table on the right side of the room. They are attentively facing the center. Name tags are clearly visible on the table in front of the attendees.",
+      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145_8.jpg",
+      "status": "pending",
+      "subtitle": "축제 성공 기원",
+      "duration": 13,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770171022179.wav",
+      "audioDuration": 10.731875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
       "text": "여수거북선축제를 이끌 추진위원장님의 굳건한 의지와 성공적인 개최를 향한 강력한 리더십이 느껴집니다.",
       "title": "축제를 이끌 주역",
       "imagePrompt": "[Original Photo Used] A close-up portrait shot of an Asian man in a dark navy suit and tie, seated centrally at a meeting table with a microphone. He is holding papers and looking forward with a professional and friendly expression.",
@@ -110,6 +108,20 @@
       "isAudioGenerating": false
     },
     {
+      "text": "제60회 여수거북선축제 추진위원회 위촉식에 오신 위원님들을 진심으로 환영합니다. 축제의 성공을 위한 첫 만남, 따뜻한 악수로 시작합니다.",
+      "title": "환영의 악수",
+      "imagePrompt": "[Original Photo Used] A formal indoor setting where a man in a dark navy suit, presumably a high official, warmly shakes hands with a committee member across a long meeting table. Other formally dressed attendees are standing and observing the handshake. The room has light wood paneled walls.",
+      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145.jpg",
+      "status": "pending",
+      "subtitle": "위촉식 시작",
+      "duration": 14,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770170945516.wav",
+      "audioDuration": 11.251875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
       "text": "각계각층의 전문가들로 구성된 위원회는 축제의 질을 높이는 든든한 지원군입니다. 대한민국 국기가 회의실의 엄숙함을 더합니다.",
       "title": "축제의 든든한 지원군",
       "imagePrompt": "[Original Photo Used] A side-angle view showing a row of several formally dressed individuals seated along a meeting table on the left side of the room. Name tags are visible on the table. The South Korean flag is visible in the background, reinforcing the official nature of the event.",
@@ -120,20 +132,6 @@
       "transition": "fade",
       "audioUrl": "/generated/audio/narration_1770171011621.wav",
       "audioDuration": 10.011875,
-      "isEnabled": true,
-      "isAudioGenerating": false
-    },
-    {
-      "text": "축제 성공을 향한 추진위원들의 진지하고 열정적인 자세가 사진 속에서 고스란히 전해집니다. 모두가 한마음으로 축제를 준비합니다.",
-      "title": "추진위원들의 열정",
-      "imagePrompt": "[Original Photo Used] A side-angle view showing a row of formally dressed men and women seated along a meeting table on the right side of the room. They are attentively facing the center. Name tags are clearly visible on the table in front of the attendees.",
-      "imageUrl": "https://www.yeosu.go.kr/mayor/together/ybmodule.file/board_mayor/mayor2_photo/980x1x100/1769671145_8.jpg",
-      "status": "pending",
-      "subtitle": "축제 성공 기원",
-      "duration": 13,
-      "transition": "fade",
-      "audioUrl": "/generated/audio/narration_1770171022179.wav",
-      "audioDuration": 10.731875,
       "isEnabled": true,
       "isAudioGenerating": false
     },
@@ -153,8 +151,8 @@
     }
   ],
   "id": "recdgiFPFQ1bhELrz",
-  "createdAt": "2026-02-04T05:20:07.387Z",
-  "updatedAt": "2026-02-04T05:20:07.387Z",
-  "videoPath": "/projects/recdgiFPFQ1bhELrz/video.webm",
-  "thumbnailPath": "/projects/recdgiFPFQ1bhELrz/thumbnail.jpg"
+  "createdAt": "2026-02-09T08:58:36.234Z",
+  "updatedAt": "2026-02-09T08:58:36.234Z",
+  "videoPath": null,
+  "thumbnailPath": ""
 }

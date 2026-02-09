@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
 import fs from 'fs';
 import path from 'path';
+import { IntegrationManager } from '@/lib/integrationManager';
 
 export async function POST(req: Request) {
     try {
@@ -35,12 +36,11 @@ export async function POST(req: Request) {
         }
 
         // Load Tokens
-        const tokenPath = path.join(process.cwd(), 'youtube-tokens.json');
-        if (!fs.existsSync(tokenPath)) {
+        // Load Tokens
+        const tokens = await IntegrationManager.getTokens('YouTube');
+        if (!tokens) {
             return NextResponse.json({ error: "YouTube account not connected. Please connect in settings." }, { status: 401 });
         }
-
-        const tokens = JSON.parse(fs.readFileSync(tokenPath, 'utf-8'));
 
         const oauth2Client = new google.auth.OAuth2(
             process.env.YOUTUBE_CLIENT_ID,
@@ -50,9 +50,8 @@ export async function POST(req: Request) {
 
         // Auto-save refreshed tokens
         oauth2Client.on('tokens', (newTokens) => {
-            // console.log("Refreshed Tokens Received");
             const merged = { ...tokens, ...newTokens };
-            fs.writeFileSync(tokenPath, JSON.stringify(merged, null, 2));
+            IntegrationManager.saveTokens('YouTube', merged);
         });
 
         const youtube = google.youtube({ version: 'v3', auth: oauth2Client });

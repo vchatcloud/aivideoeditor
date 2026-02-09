@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server';
 import { google } from 'googleapis';
-import fs from 'fs';
-import path from 'path';
+import { IntegrationManager } from '@/lib/integrationManager';
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
@@ -21,50 +20,19 @@ export async function GET(request: Request) {
     const { tokens } = await oauth2Client.getToken(code);
     oauth2Client.setCredentials(tokens);
 
-    // Save tokens locally
-    const tokenPath = path.join(process.cwd(), 'youtube-tokens.json');
-    fs.writeFileSync(tokenPath, JSON.stringify(tokens, null, 2));
-
-    // Airtable Sync (As requested)
-    if (process.env.AIRTABLE_API_KEY && process.env.AIRTABLE_BASE_ID) {
-      try {
-        const Airtable = require('airtable');
-        const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
-
-        // Check for existing record
-        const records = await base('Integrations').select({
-          filterByFormula: "{Platform} = 'YouTube'",
-          maxRecords: 1
-        }).firstPage();
-
-        const tokenData = JSON.stringify(tokens);
-
-        if (records && records.length > 0) {
-          // Update
-          await base('Integrations').update(records[0].id, {
-            "Tokens": tokenData,
-            "Status": "Active",
-            "LastUpdated": new Date().toISOString()
-          });
-        } else {
-          // Create
-          await base('Integrations').create({
-            "Platform": 'YouTube',
-            "Tokens": tokenData,
-            "Status": "Active",
-            "LastUpdated": new Date().toISOString()
-          });
-        }
-      } catch (atErr) {
-        console.error("Airtable Sync Error:", atErr);
-        // Do not fail the request, just log
-      }
-    }
-
     // Also fetch channel info to confirm
     const youtube = google.youtube({ version: 'v3', auth: oauth2Client });
     const me = await youtube.channels.list({ part: ['snippet'], mine: true });
+
     const channelName = me.data.items?.[0]?.snippet?.title || "Unknown Channel";
+    const channelIcon = me.data.items?.[0]?.snippet?.thumbnails?.default?.url || "";
+
+    // Save tokens AND metadata via Manager
+    await IntegrationManager.saveTokens('YouTube', {
+      ...tokens,
+      channelName,
+      channelIcon
+    });
 
     // Prepare success HTML
     return new NextResponse(`

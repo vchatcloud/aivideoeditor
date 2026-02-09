@@ -65,6 +65,41 @@ export async function POST(req: Request) {
             }
         }
 
+        // 3. Sync to Airtable (If projectId is an Airtable Record ID)
+        if (projectId.startsWith('rec')) {
+            const Airtable = require('airtable');
+            if (process.env.AIRTABLE_API_KEY && process.env.AIRTABLE_BASE_ID) {
+                try {
+                    const base = new Airtable({ apiKey: process.env.AIRTABLE_API_KEY }).base(process.env.AIRTABLE_BASE_ID);
+                    const record = await base('Projects').find(projectId);
+
+                    if (record) {
+                        const settingsStr = record.get('Settings') as string || '{}';
+                        let settings = JSON.parse(settingsStr);
+
+                        if (!settings.uploads) settings.uploads = [];
+
+                        // Check duplicates in Airtable
+                        const atExists = settings.uploads.some((u: any) => u.videoId === uploadRecord.videoId);
+                        if (!atExists) {
+                            settings.uploads.push({
+                                ...uploadRecord,
+                                timestamp: new Date().toISOString()
+                            });
+
+                            await base('Projects').update(projectId, {
+                                "Settings": JSON.stringify(settings)
+                            });
+                            console.log("Synced upload to Airtable for project", projectId);
+                        }
+                    }
+                } catch (atError) {
+                    console.error("Failed to sync upload to Airtable:", atError);
+                    // Don't fail the request if Airtable sync fails, as local save succeeded
+                }
+            }
+        }
+
         return NextResponse.json({ success: true, uploads: updatedUploads });
 
     } catch (error: any) {

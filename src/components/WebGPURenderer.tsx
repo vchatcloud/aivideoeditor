@@ -10,7 +10,7 @@ interface Scene {
     subtitle: string;
     title?: string;
     duration: number; // seconds
-    transition: 'none' | 'fade' | 'scale_up' | 'pop_in' | 'blink' | 'slide_left' | 'slide_right' | 'slide_up' | 'slide_down' | 'wipe_left' | 'wipe_right' | 'wipe_up' | 'wipe_down' | 'drop_in' | 'shake' | 'panorama_left' | 'panorama_right' | 'panorama_up' | 'panorama_down' | 'zoom_blur' | 'glitch' | 'directional_wipe' | 'slide' | 'zoom'; // slide/zoom are legacy aliases
+    transition: 'none' | 'fade' | 'scale_up' | 'pop_in' | 'blink' | 'slide_left' | 'slide_right' | 'slide_up' | 'slide_down' | 'wipe_left' | 'wipe_right' | 'wipe_up' | 'wipe_down' | 'drop_in' | 'shake' | 'panorama_left' | 'panorama_right' | 'panorama_up' | 'panorama_down' | 'zoom_blur' | 'glitch' | 'directional_wipe' | 'motion_wipe' | 'luma_fade' | 'slide' | 'zoom'; // slide/zoom are legacy aliases
     audioUrl?: string | null;
     audioDuration?: number; // New: For calculating strict padding
     narrationSettings?: {
@@ -44,12 +44,32 @@ export interface CaptionConfig {
             stroke: string;
             strokeThickness: number;
         };
-        animation: 'none' | 'pop' | 'shake' | 'elastic';
+        animation: 'none' | 'pop' | 'shake' | 'elastic' | 'mask_reveal' | 'typewriter' | 'karaoke_v2' | 'kinetic_stacking';
         layout: {
             wordsPerLine: number;
             safeZonePadding: boolean;
             verticalPosition?: 'top' | 'middle' | 'bottom';
         };
+    };
+}
+
+export interface OverlayConfig {
+    lightLeak: { enabled: boolean; intensity: number; colorTheme: 'warm' | 'cool' };
+    filmGrain: { enabled: boolean; intensity: number; coarseness: number };
+    dustParticles: { enabled: boolean; density: number; speed: number };
+    vignette: { enabled: boolean; intensity: number; radius: number };
+    colorGrading?: {
+        enabled: boolean;
+        brightness: number; // 1.0 = neutral
+        contrast: number;   // 1.0 = neutral
+        saturation: number; // 1.0 = neutral
+        sepia?: number;     // 0.0 - 1.0
+    };
+    bloom?: {
+        enabled: boolean;
+        strength: number;   // 0.0 - 1.0 (Opacity of the bloom layer)
+        radius: number;     // Blur radius (px)
+        threshold: number;  // 0.0 - 1.0 (Luminance threshold)
     };
 }
 
@@ -66,6 +86,7 @@ interface WebGPURendererProps {
     narrationTone?: string;
     narrationSpeed?: number; // New Prop
     narrationPitch?: number; // New Prop
+    tickerSpeed?: number; // New Prop for Ticker Speed
     subtitleSpeed?: number; // Legacy, can still be used if needed or ignored
     aiDisclosureEnabled?: boolean;
     watermarkUrl?: string | null;
@@ -98,6 +119,7 @@ interface WebGPURendererProps {
     subtitleStrokeColor?: string;
     subtitleStrokeWidth?: number;
     subtitleSyncShift?: number; // New Prop for Timing Offset
+    overlayConfig?: OverlayConfig; // New Prop for VFX Offset
     overlaySettings?: {
         grain?: boolean;
         grainIntensity?: number;
@@ -114,6 +136,9 @@ interface WebGPURendererProps {
     captionConfig?: CaptionConfig;
     seekToTime?: number | null;
     onProgress?: (current: number, total: number) => void;
+    overlayMediaUrl?: string | null; // NEW: External Overlay Media
+    quality?: 'high' | 'low'; // NEW: Quality Control
+    isScrubbing?: boolean; // NEW: Pause during scrubbing
 }
 
 // Helper to load a single bitmap
@@ -145,14 +170,19 @@ export default function WebGPURenderer({
     narrationTone = "News",
     narrationSpeed = 1.0, // Default to 1.0 (No stretch) to respect baked audio
     narrationPitch = 0,   // Default to 0 (No shift) to respect baked audio
+    tickerSpeed = 1.0,
     subtitleSpeed = 1.0,
 
     scaleMode = 'cover',
     captionConfig,
+    overlayConfig, // VFX Config
+    overlayMediaUrl, // NEW: External Overlay Media
+    quality = 'high', // Default to High
     introScale = 100,
     outroScale = 100,
-    seekToTime, // New Prop
-    onProgress, // New Prop
+    seekToTime = null,
+    onProgress,
+    isScrubbing = false,
 
     aiDisclosureEnabled = false,
     watermarkUrl = null,
@@ -207,9 +237,11 @@ export default function WebGPURenderer({
     const isPausedRef = useRef(false);
     const totalPausedTimeRef = useRef(0);
     const pauseStartTimeRef = useRef(0);
+    const wasPlayingRef = useRef(false); // Track play state before scrubbing
 
     // Refs for Overlays
     const particlesRef = useRef<{ x: number, y: number, vx: number, vy: number, alpha: number, size: number }[]>([]);
+    const overlayMediaRef = useRef<{ media: ImageBitmap | HTMLVideoElement, type: 'image' | 'video' } | null>(null); // NEW: Overlay Media Ref
 
     // Keep track of animation loop to cancel it on unmount or re-run
     const reqIdRef = useRef<number | null>(null);
@@ -219,6 +251,7 @@ export default function WebGPURenderer({
     const overlaySettingsRef = useRef(overlaySettings);
 
     // Sync Ref
+    const startTimeRef = useRef(0);
     useEffect(() => {
         overlaySettingsRef.current = overlaySettings;
     }, [overlaySettings]);
@@ -229,6 +262,91 @@ export default function WebGPURenderer({
             seekRequestRef.current = seekToTime;
         }
     }, [seekToTime]);
+
+    // Handle Scrubbing Pause
+    useEffect(() => {
+        const handlePause = async () => {
+            if (audioCtxRef.current && audioCtxRef.current.state === 'running') {
+                await audioCtxRef.current.suspend();
+            }
+            pauseStartTimeRef.current = performance.now();
+            setIsPaused(true);
+            isPausedRef.current = true;
+        };
+
+        const handleResume = async () => {
+            if (audioCtxRef.current && audioCtxRef.current.state === 'suspended') {
+                await audioCtxRef.current.resume();
+            }
+            // Update System Clock Paused Duration
+            if (pauseStartTimeRef.current > 0) {
+                const diff = performance.now() - pauseStartTimeRef.current;
+                totalPausedTimeRef.current += diff;
+                pauseStartTimeRef.current = 0;
+            }
+            setIsPaused(false);
+            isPausedRef.current = false;
+        };
+
+        if (isScrubbing) {
+            // Start Scrubbing: Save state and Force Pause
+            wasPlayingRef.current = !isPausedRef.current;
+            if (wasPlayingRef.current) {
+                handlePause();
+            }
+        } else {
+            // End Scrubbing: Restore state
+            if (wasPlayingRef.current) {
+                // If it was playing, resume
+                // But only if we are currently paused (which we should be if we forced it)
+                if (isPausedRef.current) {
+                    handleResume();
+                }
+            }
+            // If it was paused, do nothing (stay paused)
+        }
+    }, [isScrubbing]);
+
+    // NEW: Load Overlay Media
+    useEffect(() => {
+        if (!overlayMediaUrl) {
+            overlayMediaRef.current = null;
+            return;
+        }
+
+        const loadOverlay = async () => {
+            try {
+                // Determine type by extension (rough check)
+                const isVideo = overlayMediaUrl.match(/\.(mp4|webm|mov)$/i);
+                if (isVideo) {
+                    const video = document.createElement('video');
+                    video.src = overlayMediaUrl;
+                    video.crossOrigin = "anonymous";
+                    video.loop = true; // Overlays usually loop
+                    video.muted = true;
+                    video.playsInline = true;
+                    await video.play().then(() => video.pause()); // Pre-buffer
+                    overlayMediaRef.current = { media: video, type: 'video' };
+                } else {
+                    const img = new Image();
+                    img.src = overlayMediaUrl;
+                    img.crossOrigin = "anonymous";
+                    await new Promise((resolve, reject) => {
+                        img.onload = resolve;
+                        img.onerror = reject;
+                    });
+                    const bitmap = await createImageBitmap(img);
+                    overlayMediaRef.current = { media: bitmap, type: 'image' };
+                }
+                if (onLog) onLog(`Loaded Overlay Media: ${overlayMediaUrl.split('/').pop()}`);
+            } catch (e) {
+                console.error("Failed to load overlay media:", e);
+                if (onLog) onLog(`Error loading overlay: ${e}`);
+            }
+        };
+        loadOverlay();
+    }, [overlayMediaUrl, onLog]);
+
 
     // Control Handlers
     const handleTogglePause = async () => {
@@ -1082,21 +1200,17 @@ export default function WebGPURenderer({
                             const scale = (introScale ?? 100) / 100; // Convert 0-100 to 0.0-1.0
                             if (introElement instanceof HTMLVideoElement) {
                                 introElement.currentTime = localElapsed;
-                                if (scale < 0.99) drawImageScaled(ctx, introElement, canvas.width, canvas.height, scale);
-                                else drawImageCover(ctx, introElement, canvas.width, canvas.height); // Full cover if 100%
+                                drawImageContain(ctx, introElement, canvas.width, canvas.height);
                             } else if (introElement) {
-                                if (scale < 0.99) drawImageScaled(ctx, introElement, canvas.width, canvas.height, scale);
-                                else drawImageCover(ctx, introElement, canvas.width, canvas.height);
+                                drawImageContain(ctx, introElement, canvas.width, canvas.height);
                             }
                         } else if (activePhase === 'outro') {
                             const scale = (outroScale ?? 100) / 100;
                             if (outroElement instanceof HTMLVideoElement) {
                                 outroElement.currentTime = localElapsed;
-                                if (scale < 0.99) drawImageScaled(ctx, outroElement, canvas.width, canvas.height, scale);
-                                else drawImageCover(ctx, outroElement, canvas.width, canvas.height);
+                                drawImageContain(ctx, outroElement, canvas.width, canvas.height);
                             } else if (outroElement) {
-                                if (scale < 0.99) drawImageScaled(ctx, outroElement, canvas.width, canvas.height, scale);
-                                else drawImageCover(ctx, outroElement, canvas.width, canvas.height);
+                                drawImageContain(ctx, outroElement, canvas.width, canvas.height);
                             }
                         } else {
                             // SCENE DRAWING
@@ -1273,76 +1387,162 @@ export default function WebGPURenderer({
                                     }
 
                                     // --- CINEMATIC TRANSITIONS ---
+                                    // --- CINEMATIC TRANSITIONS ---
                                     else if (effect === 'zoom_blur') {
-                                        // "Zoom Blur": Scale up + Fade Out, drawing multiple copies to simulate blur lines
-                                        // Works best if 'ease' goes from 0 to 1 rapidly
+                                        // "Zoom Blur": Multi-pass scaling with 'lighter' blend for light streaks
                                         const p = ease;
+                                        // Main Image (Fading Out inverted for incoming? No, Incoming SCENE fades IN)
+                                        // logic: This block runs for INCOMING scenes or Transition effects.
+                                        // Usually 'ease' goes 0->1.
+                                        // For Zoom Blur In: Start big and transparent, end normal opaque?
+                                        // Or Start normal, zoom in?
+                                        // Assuming "Zoom Blur Transition" = Incoming image zooms IN from center.
 
-                                        // Main Image (Fading Out)
-                                        alpha = 1 - p;
-                                        const maxScale = 1.5;
-                                        const currentScale = 1 + (maxScale - 1) * p;
+                                        const iterations = 8;
+                                        const maxScale = 1.3;
 
-                                        // Draw multiple scaled copies to simulate radial blur
-                                        // We must use 'ctx.save()' for each or just manually calculate rects
-                                        const iterations = 5;
                                         ctx.save();
                                         shouldRestore = true;
-
-                                        // Composite Mode can help blend
-                                        ctx.globalCompositeOperation = 'lighter';
+                                        ctx.globalCompositeOperation = 'screen'; // Lighter blend
 
                                         for (let i = 0; i < iterations; i++) {
-                                            const subScale = 1 + ((currentScale - 1) * (i / iterations));
-                                            const subAlpha = (1 - p) / iterations; // Distribute alpha
+                                            const subP = i / (iterations - 1); // 0 to 1
+                                            // Scale: From maxScale down to 1 (if ease=1)
+                                            // Actuall logic: Current Scale depends on 'ease'.
+                                            // Let's make it zoom OUT from close up: scale 1.5 -> 1.0
+                                            const currentProgScale = 1.5 - (0.5 * ease);
+                                            // Blur trail: slightly largfer copies
+                                            const scale = currentProgScale + (0.1 * subP * (1 - ease));
 
-                                            // Calculate centeredrect
-                                            const sW = targetW * subScale;
-                                            const sH = targetH * subScale;
+                                            const opacity = (1 / iterations) * ease * (1 - subP * 0.5);
+
+                                            ctx.globalAlpha = opacity;
+
+                                            const sW = targetW * scale;
+                                            const sH = targetH * scale;
                                             const sX = baseX + (targetW - sW) / 2;
                                             const sY = baseY + (targetH - sH) / 2;
 
-                                            ctx.globalAlpha = subAlpha;
                                             ctx.drawImage(scene.bitmap, sX, sY, sW, sH);
                                         }
-
-                                        // Prevent main drawImage at bottom from drawing over content
-                                        // by setting main alpha to 0 (we handled drawing above)
-                                        alpha = 0;
+                                        alpha = 0; // Handled drawing
                                         ctx.restore();
-                                        // Note: shouldRestore=true was for the BLOCK context, but we restored manually.
-                                        // We should ensure the MAIN logic doesn't duplicate. 
                                         shouldRestore = false;
                                     }
-                                    else if (effect === 'glitch') {
-                                        // "Glitch": RGB Split + Random Offset
-                                        const p = ease;
-                                        const intensity = (Math.sin(p * Math.PI) * 20); // Peak at middle
+                                    else if (effect === 'motion_wipe') {
+                                        // "Motion Blur Wipe": Incoming Slides in from Right with trails
+                                        const p = ease; // 0 -> 1
+                                        const iterations = 10;
+                                        const trailLag = 50; // pixels
 
-                                        if (intensity > 1) {
+                                        const mainOffset = canvasW * (1 - p); // Starts at canvasW, ends at 0
+
+                                        ctx.save();
+                                        shouldRestore = true;
+
+                                        // Draw Trails
+                                        for (let i = iterations; i >= 0; i--) {
+                                            const lag = i * (trailLag * (1 - p)); // Trails tighten as it settles
+                                            const currentX = baseX + mainOffset + lag;
+
+                                            // Alpha fade for trails
+                                            const trailAlpha = 1 - (i / iterations);
+
+                                            // Skip if offscreen
+                                            if (currentX >= canvasW) continue;
+
+                                            ctx.globalAlpha = (i === 0) ? 1.0 : (trailAlpha * 0.3);
+                                            ctx.drawImage(scene.bitmap, currentX, baseY, targetW, targetH);
+                                        }
+                                        alpha = 0; // Handled
+                                        ctx.restore();
+                                        shouldRestore = false;
+                                    }
+                                    else if (effect === 'luma_fade') {
+                                        // "Pixel Dissolve" (Simulating Luma/Tech fade)
+                                        // Divide into blocks and randomly appear based on Ease
+                                        const p = ease;
+                                        const cols = 20;
+                                        const rows = 12;
+                                        const cellW = Math.ceil(canvasW / cols);
+                                        const cellH = Math.ceil(canvasH / rows);
+
+                                        ctx.save();
+                                        shouldRestore = true;
+
+                                        // We draw the image clipped to active cells
+                                        ctx.beginPath();
+
+                                        for (let r = 0; r < rows; r++) {
+                                            for (let c = 0; c < cols; c++) {
+                                                // Deterministic Random: Hash r,c
+                                                const noise = Math.sin(r * 12.9898 + c * 78.233) * 43758.5453;
+                                                const randomVal = noise - Math.floor(noise); // 0 to 1
+
+                                                // If ease > randomVal, show this block
+                                                // Add edge softness: p * 1.5 to ensure all finished
+                                                if ((p * 1.5) > randomVal || p === 1) {
+                                                    ctx.rect(c * cellW, r * cellH, cellW, cellH);
+                                                }
+                                            }
+                                        }
+                                        ctx.clip();
+                                        alpha = 1.0;
+                                        // Main draw code below will execute with this clip
+                                    }
+                                    else if (effect === 'glitch') {
+                                        // "Glitch": RGB Split + Slice Jitter
+                                        const p = ease;
+                                        const intensity = 1 - p; // High glitch at start, settles to 0
+
+                                        if (intensity > 0.01) {
                                             ctx.save();
                                             shouldRestore = true;
 
-                                            // Red Channel
+                                            const shakeX = (Math.random() - 0.5) * 50 * intensity;
+                                            const shakeY = (Math.random() - 0.5) * 10 * intensity;
+
+                                            // 1. RGB Split (Simulated with Color Blending)
+                                            // Draw Red
                                             ctx.globalCompositeOperation = 'screen';
+                                            ctx.fillStyle = '#ff0000';
                                             ctx.globalAlpha = 0.8;
-                                            ctx.fillStyle = '#ff0000'; // Tint doesn't work easily in 2D without compositing hacks or separate buffer
-                                            // Simple Offset draw
-                                            const offX = (Math.random() - 0.5) * intensity * 2;
-                                            const offY = (Math.random() - 0.5) * intensity;
-                                            ctx.drawImage(scene.bitmap, baseX + offX, baseY + offY, targetW, targetH);
+                                            // Note: 'screen' with colored rect requires distinct drawing or 'multiply' approach.
+                                            // Easier 2D Glitch: Draw Image 3 times with different offsets
 
-                                            // Blue/Cyan Channel
-                                            const offX2 = (Math.random() - 0.5) * intensity * 2;
-                                            const offY2 = (Math.random() - 0.5) * intensity;
-                                            // In 2D canvas, "chromatic aberration" is hard without 'filter'. 
-                                            // Newer browsers support ctx.filter = 'url(#...)' or blur.
-                                            // We will simulate simply by drawing multiple offsets with low alpha
+                                            // Channel 1 (Red-ish) - Left Offset
+                                            ctx.globalAlpha = 0.7 * p; // Fade in
+                                            ctx.drawImage(scene.bitmap, baseX + shakeX - (10 * intensity), baseY + shakeY, targetW, targetH);
 
-                                            ctx.globalCompositeOperation = 'source-over'; // Reset
+                                            // Channel 2 (Blue-ish) - Right Offset
+                                            ctx.globalCompositeOperation = 'screen';
+                                            ctx.drawImage(scene.bitmap, baseX + shakeX + (10 * intensity), baseY + shakeY, targetW, targetH);
+
+                                            // 2. Slice Jitter
+                                            // Draw random strips displaced
+                                            const sliceCount = 5;
+                                            for (let i = 0; i < sliceCount; i++) {
+                                                if (Math.random() < intensity) {
+                                                    const sliceY = Math.random() * targetH;
+                                                    const sliceH = Math.random() * (targetH / 5);
+                                                    const sliceOffset = (Math.random() - 0.5) * 100 * intensity;
+
+                                                    ctx.save();
+                                                    ctx.beginPath();
+                                                    ctx.rect(baseX, baseY + sliceY, targetW, sliceH);
+                                                    ctx.clip();
+                                                    // Draw displaced slice
+                                                    ctx.drawImage(scene.bitmap, baseX + sliceOffset, baseY, targetW, targetH);
+                                                    ctx.restore();
+                                                }
+                                            }
+
+                                            alpha = 0; // Handled
+                                            ctx.restore();
+                                            shouldRestore = false;
+                                        } else {
+                                            alpha = ease;
                                         }
-                                        // Let main draw handle the "Base" image
-                                        alpha = 1 - p;
                                     }
                                     else if (effect === 'directional_wipe') {
                                         // "Directional Blur Wipe": Wipe with motion trails
@@ -1433,16 +1633,53 @@ export default function WebGPURenderer({
                                     }
                                 }
 
-                                // Draw Image
+                                // --- 4.1 Color Grading & Effects (Before Draw) ---
+                                const colorGrading = overlayConfig?.colorGrading;
+                                let baseFilter = 'none';
+                                if (colorGrading && colorGrading.enabled) {
+                                    const { brightness = 1.0, contrast = 1.0, saturation = 1.0, sepia = 0 } = colorGrading;
+                                    baseFilter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation}) sepia(${sepia})`;
+                                    ctx.filter = baseFilter;
+                                } else {
+                                    ctx.filter = 'none';
+                                }
+
+                                // Draw Image (Main Pass)
                                 ctx.globalAlpha = alpha;
                                 ctx.drawImage(scene.bitmap, renderX, renderY, renderW, renderH);
+
+                                // --- 4.2 Bloom Effect (Post-Draw / Overlay) ---
+                                const bloom = overlayConfig?.bloom;
+                                if (bloom && bloom.enabled && bloom.strength > 0) {
+                                    const { strength, radius, threshold } = bloom;
+
+                                    ctx.globalCompositeOperation = 'screen';
+
+                                    // Bloom Pass:
+                                    // Recalculate filter: Base Grading + Blur + Threshold Simulation
+                                    // Threshold simulation: High Contrast + Reduced Brightness (to kill darks) then Boost?
+                                    // Or just Blur + Boost.
+                                    // Let's just do Blur + slight brightness boost for "Glow"
+                                    const bloomFilter = baseFilter !== 'none' ? baseFilter : '';
+                                    ctx.filter = `${bloomFilter} blur(${radius}px) brightness(1.2)`;
+
+                                    ctx.globalAlpha = strength * alpha; // Fade bloom with image
+                                    ctx.drawImage(scene.bitmap, renderX, renderY, renderW, renderH);
+
+                                    // Reset
+                                    ctx.globalCompositeOperation = 'source-over';
+                                }
+
+                                ctx.filter = 'none';
                                 ctx.globalAlpha = 1.0;
                                 if (shouldRestore) ctx.restore();
+
+
 
                                 // --- Text Rendering ---
                                 const isVerticalCanvas = canvasAspect < 1;
                                 const isHorizontalImage = imgAspect > 1;
-                                const isSplitLayout = isVerticalCanvas && isHorizontalImage;
+                                const isSplitLayout = isVerticalCanvas; // Enable Box Layout for all vertical videos for consistency
 
                                 // Strict Text Visibility:
                                 // If multiple scenes are active (transition overlap), 
@@ -1500,44 +1737,176 @@ export default function WebGPURenderer({
                                             const isActive = globalIndex === currentWordIndex;
                                             const wWidth = wordMetrics[idx].width;
                                             const wX = currentX + (wWidth / 2); // Center of this word
+                                            const wH = fontSize * 1.5; // Approx height
+
+                                            const wordTime = timeInScene - (currentWordIndex * wordDur);
+                                            const animProgress = isActive ? Math.min(1, Math.max(0, wordTime / wordDur)) : (globalIndex < currentWordIndex ? 1 : 0);
+                                            const entranceProgress = Math.min(1, Math.max(0, wordTime / 0.3));
 
                                             ctx.save();
                                             ctx.globalAlpha = opacity;
 
-                                            // Apply Animation to ACTIVE word
-                                            if (isActive && animation !== 'none') {
-                                                const wordTime = timeInScene - (currentWordIndex * wordDur);
-                                                const animProgress = Math.min(1, wordTime / 0.3); // 0.3s entrance
+                                            let drawX = wX;
+                                            let drawY = centerY;
 
-                                                ctx.translate(wX, centerY); // Pivot center
+                                            // --- ANIMATION IMPLEMENTATIONS ---
 
-                                                if (animation === 'pop') {
-                                                    // Elastic Scale Up
-                                                    const scale = 1 + Math.sin(animProgress * Math.PI) * (0.2 * intensity);
-                                                    ctx.scale(scale, scale);
-                                                } else if (animation === 'shake') {
-                                                    const shake = Math.sin(wordTime * 20) * (10 * intensity) * (1 - animProgress);
-                                                    ctx.rotate(shake * Math.PI / 180);
-                                                } else if (animation === 'elastic') {
-                                                    const scale = 1 + (Math.sin(animProgress * Math.PI * 2) * (1 - animProgress)) * (0.5 * intensity);
-                                                    ctx.scale(scale, scale);
+                                            if (animation === 'kinetic_stacking') {
+                                                // Words fly in from bottom with staggered delay
+                                                // Only animate if it's the current/active word or recent
+                                                const stackProgress = globalIndex === currentWordIndex ? entranceProgress : (globalIndex < currentWordIndex ? 1 : 0);
+
+                                                if (stackProgress < 1) {
+                                                    const easeOut = 1 - Math.pow(1 - stackProgress, 3); // Cubic ease out
+                                                    const yOffset = 100 * (1 - easeOut); // Fly up 100px
+                                                    drawY += yOffset;
+                                                    ctx.globalAlpha = opacity * stackProgress;
                                                 }
-                                                ctx.translate(-wX, -centerY);
-                                            }
 
-                                            // Draw Stroke
-                                            if (colors.strokeThickness > 0) {
-                                                ctx.strokeStyle = colors.stroke;
-                                                ctx.lineWidth = colors.strokeThickness;
-                                                ctx.strokeText(word, wX, centerY);
-                                            }
+                                                // Standard Draw
+                                                if (colors.strokeThickness > 0) {
+                                                    ctx.strokeStyle = colors.stroke;
+                                                    ctx.lineWidth = colors.strokeThickness;
+                                                    ctx.strokeText(word, drawX, drawY);
+                                                }
+                                                ctx.fillStyle = isActive ? colors.activeFill : colors.baseFill;
+                                                ctx.fillText(word, drawX, drawY);
 
-                                            // Draw Fill
-                                            ctx.fillStyle = isActive ? colors.activeFill : colors.baseFill;
-                                            ctx.fillText(word, wX, centerY);
+                                            } else if (animation === 'mask_reveal') {
+                                                // Text rises from invisible line
+                                                const revealProgress = globalIndex === currentWordIndex ? entranceProgress : (globalIndex < currentWordIndex ? 1 : 0);
+
+                                                // Create clipping mask at the baseline
+                                                // Create clipping mask at the baseline
+                                                // We want to clip everything BELOW the baseline initially? No, reveal is rising UP.
+                                                // So we clip to the target area (where text SHOULD be).
+                                                ctx.beginPath();
+                                                // Clip Area: From top of text (centerY - wH) down to baseline (centerY + wH/2)
+                                                // Expanding width to be safe
+                                                ctx.rect(drawX - wWidth * 1.5, centerY - wH, wWidth * 3, wH * 2);
+                                                // ACTUALLY, for "Mask Reveal", we usually want it to look like it's coming out of a slot.
+                                                // So we need to define a "slot" line. Let's say the slot is at centerY + wH/2.
+                                                // But usually standard mask reveal is just a container clip.
+                                                // The issue "50% cut" implies the rect height/y-pos is wrong.
+                                                // Previous: centerY - wH, height: wH. -> This goes from Top to Center. 
+                                                // If text is centered at centerY, it clips the bottom half.
+                                                // FIX: Height should be wH * 2 to cover bottom half too.
+
+                                                if (revealProgress < 1) {
+                                                    const easeOut = 1 - Math.pow(1 - revealProgress, 3);
+                                                    const yOffset = 30 * (1 - easeOut);
+                                                    drawY += yOffset;
+                                                    ctx.globalAlpha = opacity * revealProgress;
+                                                }
+
+                                                // Standard Draw
+                                                if (colors.strokeThickness > 0) {
+                                                    ctx.strokeStyle = colors.stroke;
+                                                    ctx.lineWidth = colors.strokeThickness;
+                                                    ctx.strokeText(word, drawX, drawY);
+                                                }
+                                                ctx.fillStyle = isActive ? colors.activeFill : colors.baseFill;
+                                                ctx.fillText(word, drawX, drawY);
+
+                                            } else if (animation === 'typewriter') {
+                                                // Typewriter: Character-by-character (syllable-by-syllable)
+                                                if (animProgress > 0) {
+                                                    let textToDraw = word;
+                                                    let currentWWidth = wWidth;
+
+                                                    if (isActive && animProgress < 1) {
+                                                        const charCount = Math.floor(word.length * animProgress);
+                                                        // Ensure at least 1 char if started
+                                                        textToDraw = word.substring(0, Math.max(1, charCount));
+                                                        currentWWidth = ctx.measureText(textToDraw).width;
+                                                    }
+
+                                                    // Alignment Stability:
+                                                    // Since text is drawn centered at drawX, a growing substring would jitter left/right.
+                                                    // We offset drawX so the LEFT edge of the substring matches the LEFT edge of the full word.
+                                                    // Left of Full = drawX - wWidth/2
+                                                    // Left of Sub = (drawX + offset) - currentWWidth/2
+                                                    // => offset = (currentWWidth - wWidth) / 2
+                                                    const alignOffset = (currentWWidth - wWidth) / 2;
+                                                    const alignedX = drawX + alignOffset;
+
+                                                    if (colors.strokeThickness > 0) {
+                                                        ctx.strokeStyle = colors.stroke;
+                                                        ctx.lineWidth = colors.strokeThickness;
+                                                        ctx.strokeText(textToDraw, alignedX, drawY);
+                                                    }
+                                                    ctx.fillStyle = isActive ? colors.activeFill : colors.baseFill;
+                                                    ctx.fillText(textToDraw, alignedX, drawY);
+
+                                                    // Optional Cursor
+                                                    if (isActive && animProgress < 1) {
+                                                        ctx.fillStyle = colors.activeFill;
+                                                        ctx.fillRect(alignedX + currentWWidth / 2 + 2, drawY - wH / 2, 2, wH);
+                                                    }
+                                                }
+
+                                            } else if (animation === 'karaoke_v2') {
+                                                // 1. Draw Base (Inactive) Layer First
+                                                if (colors.strokeThickness > 0) {
+                                                    ctx.strokeStyle = colors.stroke;
+                                                    ctx.lineWidth = colors.strokeThickness;
+                                                    ctx.strokeText(word, drawX, drawY);
+                                                }
+                                                ctx.fillStyle = colors.baseFill;
+                                                ctx.fillText(word, drawX, drawY);
+
+                                                // 2. Draw Active Fill with Clip
+                                                if (animProgress > 0) {
+                                                    ctx.save();
+                                                    ctx.beginPath();
+                                                    // Clip from Left to Right based on progress
+                                                    const clipW = wWidth * animProgress;
+                                                    ctx.rect(drawX - (wWidth / 2), drawY - wH / 2, clipW, wH);
+                                                    ctx.clip();
+
+                                                    // Re-draw stroke/fill with Active Color
+                                                    if (colors.strokeThickness > 0) {
+                                                        ctx.strokeStyle = colors.stroke; // Or distinct active stroke?
+                                                        ctx.lineWidth = colors.strokeThickness;
+                                                        ctx.strokeText(word, drawX, drawY);
+                                                    }
+                                                    ctx.fillStyle = colors.activeFill;
+                                                    ctx.fillText(word, drawX, drawY);
+                                                    ctx.restore();
+                                                }
+
+                                            } else {
+                                                // --- EXISTING ANIMATIONS (Pop, Shake, Elastic, None) ---
+                                                if (isActive && animation !== 'none') {
+                                                    // ... (Existing logic reused via copy or just kept)
+                                                    // We can't easily "copy" inside replace tool, so we explicitly restore logic:
+
+                                                    const p = entranceProgress; // Alias for consistency
+
+                                                    if (animation === 'pop') {
+                                                        const scale = 1 + Math.sin(p * Math.PI) * (0.2 * intensity);
+                                                        ctx.scale(scale, scale);
+                                                    } else if (animation === 'shake') {
+                                                        const shake = Math.sin(wordTime * 20) * (10 * intensity) * (1 - p);
+                                                        ctx.rotate(shake * Math.PI / 180);
+                                                    } else if (animation === 'elastic') {
+                                                        const scale = 1 + (Math.sin(p * Math.PI * 2) * (1 - p)) * (0.5 * intensity);
+                                                        ctx.scale(scale, scale);
+                                                    }
+                                                    ctx.translate(-drawX, -drawY);
+                                                }
+
+                                                // Standard Draw
+                                                if (colors.strokeThickness > 0) {
+                                                    ctx.strokeStyle = colors.stroke;
+                                                    ctx.lineWidth = colors.strokeThickness;
+                                                    ctx.strokeText(word, drawX, drawY);
+                                                }
+                                                ctx.fillStyle = isActive ? colors.activeFill : colors.baseFill;
+                                                ctx.fillText(word, drawX, drawY);
+                                            }
 
                                             ctx.restore();
-
                                             currentX += wWidth;
                                         });
                                     }
@@ -1697,7 +2066,7 @@ export default function WebGPURenderer({
                                                 ctx.fillStyle = subtitleBackgroundColor || "#000000";
 
                                                 const layout = scene.subLayout;
-                                                const font = `bold ${layout.fontSize}px '${subtitleFont}', sans-serif`;
+                                                const font = `bold ${layout.fontSize}px '${subtitleFont}', sans - serif`;
                                                 ctx.font = font;
 
                                                 // Match drawTextLayout positioning
@@ -1735,8 +2104,17 @@ export default function WebGPURenderer({
                                     const isDynamicOn = captionConfig?.enabled && captionConfig?.mode === 'dynamic';
                                     if (showNarrationText && scene.text && !isOutgoingOverlap && !isDynamicOn) {
                                         if (isSplitLayout && scene.narrationLayout) {
-                                            const bottomBarY = renderY + renderH;
-                                            const bottomBarH = canvasH - bottomBarY;
+                                            let bottomBarY = renderY + renderH;
+                                            let bottomBarH = canvasH - bottomBarY;
+
+                                            // [Layout Fix] For full-height vertical images (9:16), renderY+renderH equals canvasH, leaving no space.
+                                            // In this case, we FORCE a bottom overlay zone to mimic the "Split Layout" box style.
+                                            if (bottomBarH < 100) {
+                                                const optimalHeight = scene.narrationLayout.totalHeight + 80; // Text height + Padding
+                                                bottomBarH = Math.max(250, optimalHeight);
+                                                bottomBarY = canvasH - bottomBarH;
+                                            }
+
                                             if (bottomBarH > 50) {
                                                 // Draw Background for Split Layout Narration
                                                 const nBgOpacity = narrationBackgroundOpacity ?? 0;
@@ -1744,7 +2122,7 @@ export default function WebGPURenderer({
                                                     ctx.save();
                                                     ctx.globalAlpha = nBgOpacity;
                                                     ctx.fillStyle = narrationBackgroundColor || "#000000";
-                                                    ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans-serif`;
+                                                    ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans - serif`;
 
                                                     // Calculate vertical centering for the text block within the bottom bar
                                                     // matches drawTextLayout logic: startY = y + (h - totalHeight) / 2 + (lineHeight / 2)
@@ -1782,7 +2160,7 @@ export default function WebGPURenderer({
                                             }
 
                                             ctx.fillStyle = narrationColor;
-                                            ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans-serif`;
+                                            ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans - serif`;
 
                                             const textMetrics = ctx.measureText(scene.text);
                                             const textWidth = textMetrics.width;
@@ -1795,7 +2173,8 @@ export default function WebGPURenderer({
                                                 // [Fix] For horizontal videos (wide screen), the distance is huge, making it too fast.
                                                 // We increase the minDuration denominator to slow it down, even if it means not fully exiting.
                                                 const minDuration = canvas.width > 1200 ? 8 : 3;
-                                                const speed = totalDistance / Math.max(scene.duration, minDuration);
+                                                const baseSpeed = totalDistance / Math.max(scene.duration, minDuration);
+                                                const speed = baseSpeed * (tickerSpeed || 1.0);
 
                                                 const timeInScene = elapsed - scene.start;
                                                 let xPos = canvas.width + 50 - (speed * timeInScene);
@@ -1813,126 +2192,31 @@ export default function WebGPURenderer({
                                 }
                             });
 
-                            // --- DYNAMIC OVERLAYS (VFX) ---
-                            // Applied on top of all scenes
-                            // Ensure 1:1 scale for overlays (ignore zoom effects)
-                            ctx.setTransform(1, 0, 0, 1, 0, 0);
 
-                            const currentOverlays = overlaySettingsRef.current; // Read from Ref
+                            // --- LAYER 3: GLOBAL PROCEDURAL VFX ---
+                            // Interactive Preview Optimization: Throttling
+                            // If quality is 'low', pass a throttle flag to reduce particle count / complexity
+                            const throttleVFX = quality === 'low';
+                            drawProceduralVFXLayer(ctx, canvas.width, canvas.height, elapsed, overlayConfig || undefined, throttleVFX);
 
-
-                            // 1. Film Grain (Procedural Noise)
-                            if (currentOverlays.grain) {
+                            // --- LAYER 4: EXTERNAL OVERLAY MEDIA (NEW) ---
+                            if (overlayMediaRef.current) {
+                                const { media, type } = overlayMediaRef.current;
                                 ctx.save();
-                                ctx.globalCompositeOperation = 'source-over';
-                                const intensity = currentOverlays.grainIntensity ?? 0.3;
-                                // Boosted Minimum: Starts at 0.2 opacity + up to 0.5 more
-                                ctx.globalAlpha = Math.min(0.8, 0.2 + (0.5 * intensity));
-                                const grainSize = 2;
-                                // Increase count based on intensity too? Let's keep density high for better looking noise.
-                                for (let i = 0; i < 3000; i++) {
-                                    const x = Math.random() * canvasW;
-                                    const y = Math.random() * canvasH;
-                                    const w = Math.random() * 2 * grainSize;
-                                    const h = Math.random() * 2 * grainSize;
-                                    ctx.fillStyle = Math.random() > 0.5 ? '#FFFFFF' : '#000000';
-                                    ctx.fillRect(x, y, w, h);
-                                }
-                                ctx.restore();
-                            }
+                                ctx.globalCompositeOperation = 'screen'; // Default to screen for overlays like lens flares
+                                ctx.globalAlpha = 0.8; // Default opacity
 
-                            // 2. Dust Particles
-                            if (currentOverlays.particles) {
-                                ctx.save();
-                                ctx.globalCompositeOperation = 'source-over';
-
-                                const density = currentOverlays.particleDensity ?? 0.5;
-                                // Boosted Minimum: Base 60 particles + up to 140 more
-                                const maxParticles = 60 + Math.floor(140 * density);
-
-                                if (particlesRef.current.length < maxParticles) {
-                                    for (let i = particlesRef.current.length; i < maxParticles; i++) {
-                                        particlesRef.current.push({
-                                            x: Math.random() * canvasW,
-                                            y: Math.random() * canvasH,
-                                            vx: (Math.random() - 0.5) * 0.5,
-                                            vy: -0.2 - Math.random() * 0.5,
-                                            size: Math.random() * 4 + 2,
-                                            alpha: Math.random()
-                                        });
-                                    }
-                                }
-                                // Trim if too many (density reduced)
-                                if (particlesRef.current.length > maxParticles) {
-                                    particlesRef.current.splice(maxParticles);
+                                // Ensure video plays
+                                if (type === 'video') {
+                                    const v = media as HTMLVideoElement;
+                                    if (v.paused && !isPausedRef.current) v.play().catch(() => { });
+                                    if (!v.paused && isPausedRef.current) v.pause();
                                 }
 
-                                particlesRef.current.forEach(p => {
-                                    p.x += p.vx;
-                                    p.y += p.vy;
-                                    p.alpha += (Math.random() - 0.5) * 0.02;
-
-                                    if (p.y < -10) p.y = canvasH + 10;
-                                    if (p.x < -10) p.x = canvasW + 10;
-                                    if (p.x > canvasW + 10) p.x = -10;
-
-                                    ctx.globalAlpha = Math.max(0, Math.min(0.9, p.alpha));
-                                    ctx.fillStyle = '#ffffff';
-                                    ctx.beginPath();
-                                    ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-                                    ctx.fill();
-                                });
+                                drawImageCover(ctx, media, canvasW, canvasH);
                                 ctx.restore();
                             }
 
-                            // 2.5 Light Leaks (Screen overlay)
-                            if (currentOverlays.lightLeak) {
-                                ctx.save();
-                                ctx.globalCompositeOperation = 'screen';
-                                const intensity = currentOverlays.lightLeakIntensity ?? 0.5;
-                                ctx.globalAlpha = intensity * 0.6; // Max 0.6 opacity
-
-                                const t = frameCount * 0.02; // Slow animation
-
-                                // Leak 1: Warm Orange from side
-                                const gradient1 = ctx.createLinearGradient(
-                                    canvasW * (0.2 + Math.sin(t) * 0.3), 0,
-                                    canvasW * (0.8 + Math.cos(t * 0.7) * 0.3), canvasH
-                                );
-                                gradient1.addColorStop(0, 'rgba(255, 100, 50, 0)');
-                                gradient1.addColorStop(0.5, 'rgba(255, 140, 50, 0.5)');
-                                gradient1.addColorStop(1, 'rgba(255, 100, 50, 0)');
-
-                                ctx.fillStyle = gradient1;
-                                ctx.fillRect(0, 0, canvasW, canvasH);
-
-                                // Leak 2: Random bright flashes/blobs
-                                const x = canvasW * (0.5 + Math.sin(t * 1.3) * 0.4);
-                                const y = canvasH * (0.5 + Math.cos(t * 1.5) * 0.4);
-                                const r = Math.max(100, canvasH * 0.8 * (0.5 + Math.sin(t * 0.5) * 0.2));
-
-                                const gradient2 = ctx.createRadialGradient(x, y, 0, x, y, r);
-                                gradient2.addColorStop(0, 'rgba(255, 220, 180, 0.4)');
-                                gradient2.addColorStop(1, 'rgba(255, 200, 150, 0)');
-
-                                ctx.fillStyle = gradient2;
-                                ctx.fillRect(0, 0, canvasW, canvasH);
-
-                                ctx.restore();
-                            }
-
-                            // 3. Vignette
-                            if (currentOverlays.vignette) {
-                                ctx.save();
-                                ctx.globalCompositeOperation = 'source-over';
-                                const intensity = currentOverlays.vignetteIntensity ?? 0.7;
-                                const gradient = ctx.createRadialGradient(canvasW / 2, canvasH / 2, canvasH * 0.4, canvasW / 2, canvasH / 2, canvasH * 0.9);
-                                gradient.addColorStop(0, 'rgba(0,0,0,0)');
-                                gradient.addColorStop(1, `rgba(0,0,0,${intensity})`); // Dynamic Opacity
-                                ctx.fillStyle = gradient;
-                                ctx.fillRect(0, 0, canvasW, canvasH);
-                                ctx.restore();
-                            }
 
                             // 3. AUDIO VISUALIZER (On Overlay Canvas)
                             if (analyser && vizCanvasRef.current) {
@@ -2042,7 +2326,7 @@ export default function WebGPURenderer({
 
                                 // 4. Draw Label Text
                                 ctx.fillStyle = "#064e3b"; // Dark green text
-                                ctx.font = `bold ${fontSize}px 'Pretendard', sans-serif`;
+                                ctx.font = `bold ${fontSize}px 'Pretendard', sans - serif`;
                                 ctx.textAlign = "center";
                                 ctx.textBaseline = "middle";
                                 ctx.fillText("자세히보기", qrX + totalW / 2, qrY + size + border * 2 + labelHeight / 2);
@@ -2092,12 +2376,12 @@ export default function WebGPURenderer({
                 };
 
                 // Start Loop
-                startTimeSystem = performance.now();
+                startTimeRef.current = performance.now();
                 reqIdRef.current = requestAnimationFrame(drawFrame);
 
             } catch (e: any) {
                 console.error("Run error:", e);
-                setError(`Setup Failed: ${e.message}`);
+                setError(`Setup Failed: ${e.message} `);
                 setStatus("Setup Failed");
             }
         };
@@ -2117,7 +2401,30 @@ export default function WebGPURenderer({
             window.speechSynthesis.cancel();
         }
 
-    }, [scenes, audioSrc, audioVolume, onComplete, aiDisclosureEnabled, watermarkUrl, subtitleFontSize, narrationFontSize, previewMode, subtitleColor, narrationColor, subtitleFont, narrationFont, qrCodeUrl, qrCodeSize, qrCodePosition, subtitleEffectStyle, subtitleEffectColor, subtitleEffectParam, subtitleEntranceAnimation, subtitleExitAnimation, narrationSpeed, renderId, introMedia, outroMedia, introScale, outroScale, backgroundColor, backgroundUrl, subtitleBackgroundColor, subtitleBackgroundOpacity, narrationBackgroundColor, narrationBackgroundOpacity, captionConfig, subtitleSyncShift, canvasWidth, canvasHeight, narrationEnabled, subtitleOpacity, subtitleStrokeColor, subtitleStrokeWidth, scaleMode]); // Re-run on renderId change (Restart)
+
+
+    }, [scenes, audioSrc, audioVolume, onComplete, aiDisclosureEnabled, watermarkUrl, subtitleFontSize, narrationFontSize, previewMode, subtitleColor, narrationColor, subtitleFont, narrationFont, qrCodeUrl, qrCodeSize, qrCodePosition, subtitleEffectStyle, subtitleEffectColor, subtitleEffectParam, subtitleEntranceAnimation, subtitleExitAnimation, narrationSpeed, tickerSpeed, renderId, introMedia, outroMedia, introScale, outroScale, backgroundColor, backgroundUrl, subtitleBackgroundColor, subtitleBackgroundOpacity, narrationBackgroundColor, narrationBackgroundOpacity, captionConfig, subtitleSyncShift, canvasWidth, canvasHeight, narrationEnabled, subtitleOpacity, subtitleStrokeColor, subtitleStrokeWidth, scaleMode, overlayConfig, overlayMediaUrl, onLog, quality]);
+
+    // Handle Seek (New Effect)
+    useEffect(() => {
+        if (seekToTime !== null && seekToTime >= 0) {
+            // Formula: elapsed = now - start - paused
+            // seekTime * 1000 = now - start - paused
+            // start = now - (seekTime * 1000) - paused
+            startTimeRef.current = performance.now() - (seekToTime * 1000) - totalPausedTimeRef.current;
+
+            // Optional: If paused, we might need to force a single frame draw? 
+            // The loop might be paused.
+            if (isPausedRef.current) {
+                // We can't easily force a draw without exposing drawFrame outside. 
+                // But if we toggle pause off/on or rely on the fact that user usually drags while playing...
+                // Actually user often scrubs while paused.
+                // We should probably allow the loop to run ONCE if paused? 
+                // Or simpler: Just update the ref. If paused, it won't update visually until resume OR if we have a separate mechanism.
+                // For now, let's assume scrubbing happens while playing or we accept resume-to-see.
+            }
+        }
+    }, [seekToTime]);
 
     if (error) return <div className="text-red-500">{error}</div>;
 
@@ -2125,8 +2432,14 @@ export default function WebGPURenderer({
         <div className="relative rounded-lg overflow-hidden bg-black w-full h-full flex items-center justify-center">
             <canvas
                 ref={canvasRef}
-                width={canvasWidth}
-                height={canvasHeight}
+                // Interactive Preview Optimization: Use scaled internal resolution if quality is 'low'
+                width={quality === 'low' ? Math.min(canvasWidth, 1280) : canvasWidth}
+                height={quality === 'low' ? Math.min(canvasHeight, (1280 / canvasWidth) * canvasHeight) : canvasHeight}
+                style={{
+                    width: '100%',
+                    height: '100%',
+                    objectFit: 'contain'
+                }}
                 className="w-full h-full object-contain"
             />
 
@@ -2191,6 +2504,121 @@ export default function WebGPURenderer({
         </div>
     );
 };
+
+// --- LAYER FUNCTIONS (Refactored) ---
+
+function drawProceduralVFXLayer(ctx: CanvasRenderingContext2D, width: number, height: number, time: number, config?: OverlayConfig, throttle: boolean = false) {
+    if (!config) return;
+
+    // Ensure 1:1 scale for overlays (ignore zoom effects)
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+
+    // A. Light Leaks
+    if (config.lightLeak?.enabled) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'screen';
+        ctx.globalAlpha = (config.lightLeak.intensity || 0.5) * 0.5;
+
+        // Throttling: Reduce light leak complexity if needed (currently cheap, so maybe just 1 leak?)
+        const leakCount = throttle ? 1 : 2;
+
+        // Moving gradients
+        const leaks = [
+            { x: Math.sin(time * 0.5) * width, y: Math.cos(time * 0.3) * height, r: width * 0.8, c: config.lightLeak.colorTheme === 'warm' ? ['#ff9966', '#ff5e62'] : ['#4facfe', '#00f2fe'] },
+            { x: Math.cos(time * 0.4) * width, y: Math.sin(time * 0.6) * height, r: width * 0.6, c: config.lightLeak.colorTheme === 'warm' ? ['#f2994a', '#f2c94c'] : ['#43e97b', '#38f9d7'] }
+        ];
+
+        leaks.slice(0, leakCount).forEach(leak => {
+            const g = ctx.createRadialGradient(Math.abs(leak.x), Math.abs(leak.y), 0, Math.abs(leak.x), Math.abs(leak.y), leak.r);
+            g.addColorStop(0, leak.c[0]);
+            g.addColorStop(1, 'transparent');
+            ctx.fillStyle = g;
+            ctx.fillRect(0, 0, width, height);
+        });
+        ctx.restore();
+    }
+
+    // B. Film Grain
+    if (config.filmGrain?.enabled) {
+        const intensity = config.filmGrain.intensity || 0.3;
+        if (intensity > 0) {
+            ctx.save();
+            ctx.globalCompositeOperation = 'source-over';
+            ctx.globalAlpha = intensity * 0.4;
+
+            const coarseness = config.filmGrain.coarseness || 2;
+
+            // Throttling: Reduce grain count by 50%
+            const grainCount = throttle ? 150 : 300;
+
+            // 1. Black Grains
+            ctx.fillStyle = '#000000';
+            for (let n = 0; n < grainCount; n++) {
+                const nx = Math.random() * width;
+                const ny = Math.random() * height;
+                const ns = (Math.random() + 0.5) * coarseness;
+                ctx.fillRect(nx, ny, ns, ns);
+            }
+
+            // 2. White Grains
+            ctx.fillStyle = '#ffffff';
+            ctx.globalAlpha = intensity * 0.3;
+            for (let n = 0; n < grainCount; n++) {
+                const nx = Math.random() * width;
+                const ny = Math.random() * height;
+                const ns = (Math.random() + 0.5) * coarseness;
+                ctx.fillRect(nx, ny, ns, ns);
+            }
+            ctx.restore();
+        }
+    }
+
+    // C. Dust Particles
+    if (config.dustParticles?.enabled) {
+        ctx.save();
+        ctx.fillStyle = 'white';
+        ctx.shadowColor = 'white';
+        ctx.shadowBlur = 4;
+        ctx.globalAlpha = 0.8;
+
+        // Throttling: Reduce particle density
+        const baseDensity = config.dustParticles.density || 0.5;
+        const effectiveDensity = throttle ? baseDensity * 0.5 : baseDensity;
+
+        const count = Math.floor(effectiveDensity * 400);
+        for (let i = 0; i < count; i++) {
+            const speed = (config.dustParticles.speed || 0.5) * 80;
+            const x = ((Math.sin(i * 13.3 + time * 0.2) + 1.2) * width * 0.5 + (Math.cos(time * 0.15 + i) * speed * 2)) % width;
+            const y = ((i * 123.4 + time * speed) % (height + 50)) - 25;
+            const size = (i % 3 === 0) ? 2.5 : ((i % 2 === 0) ? 1.5 : 0.8);
+
+            ctx.beginPath();
+            const safeX = x < 0 ? x + width : x;
+            ctx.arc(safeX, y, size, 0, Math.PI * 2);
+            ctx.fill();
+        }
+        ctx.restore();
+    }
+
+    // D. Vignette
+    if (config.vignette?.enabled) {
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        const vInt = config.vignette.intensity || 0.7;
+        const maxDim = Math.max(width, height);
+        const rInner = maxDim * (0.6 - (vInt * 0.6));
+        const rOuter = maxDim * (1.2 - (vInt * 0.7));
+
+        const g = ctx.createRadialGradient(width / 2, height / 2, Math.max(0, rInner), width / 2, height / 2, Math.max(0, rOuter));
+        g.addColorStop(0, 'rgba(0,0,0,0)');
+        g.addColorStop(0.5, `rgba(0,0,0,${vInt * 0.5})`);
+        g.addColorStop(1, `rgba(0,0,0,${Math.min(1, vInt * 2.0)})`);
+
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
+    }
+}
 
 // Helper: Cover Fit Draw
 // Helper: Cover Fit Draw
@@ -2262,6 +2690,32 @@ function drawImageScaled(ctx: CanvasRenderingContext2D, img: HTMLImageElement | 
     const targetH = baseH * scale;
 
     // 3. Center
+    const x = (w - targetW) / 2;
+    const y = (h - targetH) / 2;
+
+    ctx.drawImage(img, x, y, targetW, targetH);
+}
+
+function drawImageContain(ctx: CanvasRenderingContext2D, img: HTMLImageElement | HTMLVideoElement | ImageBitmap, w: number, h: number) {
+    if (!img) return;
+    let imgW = 0;
+    let imgH = 0;
+
+    if (img instanceof HTMLVideoElement) {
+        imgW = img.videoWidth;
+        imgH = img.videoHeight;
+    } else {
+        imgW = img.width;
+        imgH = img.height;
+    }
+
+    if (!imgW || !imgH) return;
+
+    // Scale to fit
+    const scale = Math.min(w / imgW, h / imgH);
+    const targetW = imgW * scale;
+    const targetH = imgH * scale;
+
     const x = (w - targetW) / 2;
     const y = (h - targetH) / 2;
 

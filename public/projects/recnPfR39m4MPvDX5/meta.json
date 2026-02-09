@@ -100,5 +100,14 @@
   "createdAt": "2026-02-05T02:14:27.991Z",
   "updatedAt": "2026-02-05T02:14:27.991Z",
   "videoPath": "/projects/recnPfR39m4MPvDX5/video.webm",
-  "thumbnailPath": "/projects/recnPfR39m4MPvDX5/thumbnail.jpg"
+  "thumbnailPath": "/projects/recnPfR39m4MPvDX5/thumbnail.jpg",
+  "uploads": [
+    {
+      "platform": "youtube",
+      "videoId": "JObvI1HY-YY",
+      "url": "https://youtu.be/JObvI1HY-YY",
+      "status": "private",
+      "timestamp": "2026-02-06T01:39:18.681Z"
+    }
+  ]
 }

@@ -8,7 +8,7 @@ const pdfParse = require('pdf-parse-fork');
 
 export async function POST(request: Request) {
     try {
-        const { text, images, imageUrls, pdfUrls, analysisMode, allowImageVariation, selectedStyle, sceneCount, videoPurpose, imageComposition, imageMood, imageInterpretation, narrationLength } = await request.json();
+        const { text, images, imageUrls, pdfUrls, analysisMode, allowImageVariation, selectedStyle, sceneCount, videoPurpose, imageComposition, imageMood, imageInterpretation, narrationLength, customPrompt } = await request.json();
 
         // Map analysisMode to purpose for internal logic compatibility
         const structureMode = analysisMode || 'detail'; // Renamed variable to avoid confusion with videoPurpose
@@ -369,6 +369,9 @@ ${imageStylePrompt}
 - **key**: Focus on brevity (3-5 takeaways). Direct response.
 - **event**: (See 'Event' tone above - prioritize visual attractiveness).
 
+**User Specific Instructions (HIGHEST PRIORITY)**:
+${customPrompt ? `- ${customPrompt}` : "None"}
+
 Task:
 1. [Image Text Extraction] (CRITICAL):
    - Thoroughly read and extract ALL text visible within the provided images (e.g., posters, infograpics, documents).
@@ -393,7 +396,7 @@ Task:
 6. [Scene Creation]:
    - ${!sceneCount || sceneCount === 'AUTO' ? "Create 4-8 scenes" : `Create EXACTLY ${sceneCount} scenes`} based on BOTH the main text AND the text extracted from images.
    - For each scene: 
-     - text (narrative Korean): ${narrationLength === 'Short' ? "Strictly 1-2 concise sentences." : narrationLength === 'Long' ? "5+ detailed sentences with storytelling." : "3-4 balanced sentences."} Title (short), subtitle (tight display text), and imagePrompt (detailed English). **CRITICAL**: ALL visible text in images (signage, labels, UI) MUST be strictly in Korean (Hangul).
+     - text (narrative Korean): ${narrationLength === 'Short' ? "Strictly 1-2 concise sentences. Maximum 80 characters. Core facts only." : narrationLength === 'Long' ? "5+ detailed sentences with storytelling." : "3-4 balanced sentences. ~150 characters."} Title (short), subtitle (tight display text), and imagePrompt (detailed English). **CRITICAL**: ALL visible text in images (signage, labels, UI) MUST be strictly in Korean (Hangul).
      - **IF PURPOSE IS 'detailed' OR 'infographic'**: Mandate a structured infographic layout. Describe embedding the 'subtitle' and key data as bold graphic text strictly in Korean (Hangul).
      - **IF PURPOSE IS NOT 'detailed' AND NOT 'infographic'**: Focus on visual metaphors. If text appears, keep it to 1-3 words in signage, strictly in Korean (Hangul).
      - Ensure character and theme consistency.
@@ -438,7 +441,7 @@ ${hasDocumentContent ? `1. First, create 1-3 introductory scenes summarizing the
      - Scene [Next+1] MUST correspond to Image 2.
      - ...and so on.
      - For each scene:
-       - **text**: A warm, engaging narration describing the specific image or connecting it to the main context. **MUST BE IN KOREAN (Hangul)**.
+       - **text**: ${narrationLength === 'Short' ? "Strictly 1-2 concise sentences (Max 80 chars)." : narrationLength === 'Long' ? "Detailed storytelling (5+ sentences)." : "A warm, engaging narration (3-4 sentences)."} **MUST BE IN KOREAN (Hangul)**.
        - **title**: A short caption for the photo. **MUST BE IN KOREAN (Hangul)**.
        - **subtitle**: Date or location context if available, or a short keyword. **MUST BE IN KOREAN (Hangul)**.
        - **imagePrompt**: ${allowImageVariation ? `Describes the content of the attached image EXACTLY as it is (maintain subject, pose, composition, background), but explicitly apply the visual style: '${selectedStyle || "High Quality Photo"}'. Do NOT change the content, only the specific artistic style.` : "Describe the content of the image in detail."}

@@ -1,0 +1,109 @@
+{
+  "groupTitle": "2026년 사회적기업 일자리창출 사업 참여 기업을 모집합니다. 서울 소재 유급근로자 1인 이상, 상시근로자 30인 미만 기업이 대상이며, 취약계층 신규 채용 시 SVI 등급에 따라 최대 3년간 월 50~90만원의 임금을 지원합니다. 사회적 가치 실현에 기여하는 기업들의 많은 참여를 독려합니다.",
+  "title": "2026년 사회적기업 일자리창출 사업 참여 기업을 모집합니다. 서울 소재 유급근로자 1인 이상, 상시근로자 30인 미만 기업이 대상이며, 취약계층 신규 채용 시 SVI 등급에 따라 최대 3년간 월 50~90만원의 임금을 지원합니다. 사회적 가치 실현에 기여하는 기업들의 많은 참여를 독려합니다.",
+  "duration": 35,
+  "usage": {
+    "scriptCost": 1.2680250000000002,
+    "imageCost": 0,
+    "audioCost": 0,
+    "totalCost": 1.2680250000000002
+  },
+  "scenes": [
+    {
+      "text": "사회적 가치를 실현하며 취약계층에게 안정적인 일자리를 제공하는 (예비)사회적기업을 응원합니다. 2026년 일자리창출 사업에 참여할 역량 있는 기업을 모집하오니 많은 관심과 신청 바랍니다. 이 지원을 통해 기업과 사회가 함께 성장하는 미래를 약속합니다.",
+      "title": "사회적 가치 실현",
+      "imagePrompt": "Wide shot of a clean, bright, modern office interior with cool blue tones. A professional Korean woman in a crisp blazer stands on the right, looking confidently towards a large infographic overlay on the left. The graphic is a minimalist flow chart titled \"2026년 일자리 창출 사업\" in bold Korean text, set against a wide negative space. Minimalist background, high contrast, professional lighting. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "2026년 일자리 창출 사업 모집 공고",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "사업 참여를 위해서는 몇 가지 핵심 조건을 충족해야 합니다. 2026년 1월 말 기준으로 서울에 소재하며 유급근로자를 1명 이상 고용하고 있어야 합니다. 또한 상시근로자 수는 30인 미만이어야 하나, SVI 평가 우수 기업은 예외가 적용됩니다.",
+      "title": "필수 참여 대상 기준",
+      "imagePrompt": "Wide shot of a modern office. A professional Korean woman in business attire stands on the right. The left side features a structured split-screen infographic detailing eligibility criteria. Key Korean text embedded: \"참여 대상 요건\", \"① 서울 소재 & 유급근로자 1인 이상\", and \"② 상시근로자 30인 미만 (SVI 우수 예외)\" in bold Hangul. Cool blue filter, bright office lighting. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "서울 소재 유급근로자 1인 이상 기업",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "일반적인 상시근로자 30인 미만 기준과 별개로, 사회적 가치(SVI) 평가에서 '탁월' 또는 '우수' 등급을 받은 기업은 30인 이상이더라도 참여가 가능합니다. 이는 사회적 가치 실현에 집중하는 기업에 대한 강력한 격려입니다.",
+      "title": "특별 예외 조항",
+      "imagePrompt": "Wide shot of a clean, brightly lit office. A professional Korean woman stands on the right, holding a tablet displaying a positive growth graph. The left side features a prominent minimalist bar chart infographic illustrating the \"SVI 평가 우대\" (SVI Evaluation Preference). The chart bars are labeled in Korean: \"탁월\", \"우수\", showing eligibility even for larger enterprises. Cool blue tones dominate the professional environment. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "SVI 평가 '탁월', '우수' 기업 우대",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "본 사업은 사회적기업 육성법에 따른 취약계층 또는 국민취업지원제도 참여자를 신규 채용하는 기업을 지원합니다. 기업별로 최소 1명부터 최대 50명까지 지원받을 수 있어, 성장에 필요한 인력 확보에 큰 도움이 됩니다.",
+      "title": "지원 내용과 범위",
+      "imagePrompt": "Wide shot of a bright office setting in Seoul. A professional Korean woman on the right, gesturing toward the graphic. The left side features a neat vector infographic showing the scale of support. Embedded Korean text highlights: \"지원 인원: 1인 이상 ~ 50명 이하\" and \"지원 내용: 취약계층 신규 채용 임금 지원\". Clean, professional design with blue accents. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "취약계층 신규 채용 시 임금 지원 (1인~50명)",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "지원금액은 사회적 가치(SVI) 평가 등급에 따라 차등 지급됩니다. 탁월 기업은 월 90만원, 우수 기업은 월 70만원, 그 외 기업은 월 50만원을 지원받습니다. 높은 사회적 성과를 낼수록 더 큰 혜택을 누릴 수 있습니다.",
+      "title": "임금 지원액 차등 지급",
+      "imagePrompt": "Wide shot of a highly professional office. A professional Korean woman on the right, pointing precisely to the key funding table on the left. The left side features a clean, high-contrast infographic table detailing the funding tiers. The table clearly displays the structure in bold Korean text: \"SVI 탁월기업 (월 90만원)\", \"SVI 우수기업 (월 70만원)\", and \"SVI 양호 이하/미참여기업 (월 50만원)\". Cool blue lighting, structured graphic layout. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "SVI 등급별 월 50만원 ~ 90만원 지원",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "지원금은 1일 8시간, 주 40시간 근무를 기준으로 산정됩니다. 만약 소정근로시간이 주 40시간 미만인 경우에는 해당 근로시간에 비례하여 지원금이 정확히 산정되어 지급됩니다.",
+      "title": "근로시간 기준",
+      "imagePrompt": "Wide shot of a bright office setting with cool blue light. A professional Korean woman stands on the right, looking determined. The left side features a segmented infographic outlining the calculation standard using vector icons representing hours and clocks. Key Korean text embedded: \"지원금 산정 기준\" and \"40시간 미만 시, 근로시간 비례 지원\". Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "주 40시간 기준, 비례 산정 지원",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    },
+    {
+      "text": "신규 고용 후 최소 6개월 이상 고용을 유지해야 지원 조건이 충족됩니다. 지원 기간은 기본 1년 약정 후, 최대 3년간 연장이 가능합니다. 특히 SVI 평가 '우수' 이상인 기업은 추가 1년 지원의 기회가 주어집니다.",
+      "title": "안정적인 고용 유지 조건",
+      "imagePrompt": "Wide shot of a modern office lounge area featuring cool blue light and minimalist design. A professional Korean woman stands on the right. The left side features a clean timeline infographic illustrating the support period. Key Korean text embedded: \"지원 기간: 2026. 5. 1. ~ 2027. 4. 30. (1년)\" and \"최대 3년 지원 (SVI 우수 시 +1년)\". The timeline emphasizes long-term stability. Composition: wide shot, subject on the right, wide negative space on the left.",
+      "imageUrl": null,
+      "status": "pending",
+      "subtitle": "6개월 이상 고용 유지, 최대 3년 지원",
+      "duration": 5,
+      "transition": "fade",
+      "audioUrl": null,
+      "audioDuration": 0,
+      "isEnabled": true
+    }
+  ],
+  "id": "350738c1-e9a6-4704-bf51-ea9d5ea5445e",
+  "createdAt": "2026-02-05T09:27:16.279Z",
+  "updatedAt": "2026-02-05T09:27:16.279Z",
+  "videoPath": null,
+  "thumbnailPath": ""
+}

@@ -29,5 +29,42 @@
   "createdAt": "2026-02-05T02:39:37.269Z",
   "updatedAt": "2026-02-05T02:39:37.269Z",
   "videoPath": "/projects/rec5lUf7h8dktKxIv/video.webm",
-  "thumbnailPath": "/projects/rec5lUf7h8dktKxIv/thumbnail.jpg"
+  "thumbnailPath": "/projects/rec5lUf7h8dktKxIv/thumbnail.jpg",
+  "uploads": [
+    {
+      "platform": "youtube",
+      "videoId": "nD0TH2J6r_I",
+      "url": "https://youtu.be/nD0TH2J6r_I",
+      "status": "private",
+      "timestamp": "2026-02-06T01:37:56.617Z"
+    },
+    {
+      "platform": "youtube",
+      "videoId": "g231qzjiBiM",
+      "url": "https://youtu.be/g231qzjiBiM",
+      "status": "private",
+      "timestamp": "2026-02-06T01:42:15.924Z"
+    },
+    {
+      "platform": "youtube",
+      "videoId": "PtZ7086ZDzI",
+      "url": "https://youtu.be/PtZ7086ZDzI",
+      "status": "private",
+      "timestamp": "2026-02-06T01:42:43.010Z"
+    },
+    {
+      "platform": "youtube",
+      "videoId": "gFlEt27Iwm0",
+      "url": "https://youtu.be/gFlEt27Iwm0",
+      "status": "private",
+      "timestamp": "2026-02-06T01:45:51.734Z"
+    },
+    {
+      "platform": "youtube",
+      "videoId": "VdZZvQlINoc",
+      "url": "https://youtu.be/VdZZvQlINoc",
+      "status": "private",
+      "timestamp": "2026-02-06T01:50:44.221Z"
+    }
+  ]
 }

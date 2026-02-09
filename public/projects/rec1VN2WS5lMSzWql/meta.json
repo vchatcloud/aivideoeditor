@@ -1,0 +1,88 @@
+{
+  "groupTitle": "2026년 제1기 임산부 프로그램 안내 및 수강생 모집 안내새로운글",
+  "title": "2026년 제1기 임산부 프로그램 안내 및 수강생 모집 안내새로운글",
+  "duration": 25,
+  "usage": {
+    "scriptCost": 1.3543725,
+    "imageCost": 290,
+    "audioCost": 33.1,
+    "totalCost": 324.45437250000003
+  },
+  "scenes": [
+    {
+      "text": "2026년 여수시 제1기 임산부 프로그램이 드디어 시작됩니다. '소중한 아이, 행복한 엄마'라는 주제로, 임산부의 건강과 정서적 안정을 돕는 다양한 강좌가 마련되었습니다. 2월 11일부터 선착순으로 접수하니, 기간을 놓치지 않도록 서둘러 신청해 주세요.",
+      "title": "여수시 임산부 프로그램",
+      "imagePrompt": "Wide shot, subject on the right, wide negative space on the left, minimalist modern health clinic waiting area with cool blue ambient lighting and bright office illumination. A young, smiling pregnant Korean woman (7 months, soft beige knit dress) is seated comfortably on the right, looking forward. The left negative space is occupied by a large, clean infographic panel structured like a timeline flow chart, professionally designed with cool blue and white colors. Embedded bold Korean text on the chart must read: '모집 기간: 2026. 2. 11. ~ 2. 19. 선착순', '운영 기간: 2026. 3. 3. ~ 4. 30.'. Professional, high-definition quality, wide shot composition.",
+      "imageUrl": "/generated/img_1770356871675_mc0cle.jpg",
+      "status": "approved",
+      "subtitle": "2026년 제1기 수강생 모집",
+      "duration": 23,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770357051359.wav",
+      "audioDuration": 20.171875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "본 프로그램은 여수시에 주민등록을 두고 거주하는 임산부를 대상으로 합니다. 신청은 편리하게 여수시 OK통합예약시스템 홈페이지를 통해서만 접수받습니다. 시스템 접속 후 '교육강좌' 메뉴에서 '보건소 임산부ㆍ영유아 프로그램'을 선택하시면 됩니다.",
+      "title": "놓치지 않을 신청 정보",
+      "imagePrompt": "Wide shot, subject on the right, wide negative space on the left, minimalist modern office interior with cool blue tones and bright, clean lighting. The pregnant Korean woman is standing on the right, looking at a digital tablet. The left negative space features a clean infographic graphic showing a step-by-step flow diagram (1-2-3 sequence) detailing online registration. Embedded bold Korean text on the diagram must include: '대상: 여수시 거주 임산부', '신청 단계: 홈페이지 접속 → 교육강좌 → 보건소 프로그램 신청'. Clean, professional design, wide shot composition.",
+      "imageUrl": "/generated/img_1770356894695_i83rrz.jpg",
+      "status": "approved",
+      "subtitle": "여수시 OK통합예약시스템 접수",
+      "duration": 22,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770357069778.wav",
+      "audioDuration": 19.131875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "임신 16주 이상 임산부를 위한 임부요가와 볼요가 강좌가 준비되어 있습니다. 요가는 근육 이완과 근력 강화에 도움을 주며, 볼 요가는 자세 교정과 림프 순환 동작에 집중합니다. 안전을 위해 임신 초기 위험 방지 주수 제한이 적용됩니다.",
+      "title": "건강한 변화, 임부 요가",
+      "imagePrompt": "Wide shot, subject on the right, wide negative space on the left. The pregnant Korean woman is performing a gentle stretch using a yoga ball in a bright, cool-toned studio on the right. The left negative space holds a comparative infographic split-screen chart using blue and white columns, comparing '임부요가' and '볼요가'. Embedded bold Korean text in the chart must emphasize benefits and numbers: '임부요가: 근력 강화, 13명', '볼요가: 자세 교정, 13명', '대상: 16주 이상 임산부'. Highly detailed structured graphic, professional, wide shot composition.",
+      "imageUrl": "/generated/img_1770356920645_sxsjf.jpg",
+      "status": "approved",
+      "subtitle": "요가 (13명) & 볼요가 (13명)",
+      "duration": 23,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770357093352.wav",
+      "audioDuration": 20.211875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "정서적 교감을 위한 미술교실과 태교공예 프로그램도 마련되었습니다. 미술교실에서는 초음파 사진을 이용한 작품을 만들고, 태교공예에서는 애착인형이나 모빌 만들기를 진행합니다. (일부 공예 재료는 자부담금이 발생할 수 있습니다.)",
+      "title": "태교의 즐거움, 창의 수업",
+      "imagePrompt": "Wide shot, subject on the right, wide negative space on the left. The pregnant Korean woman is happily working on a small craft (perhaps a stuffed animal or picture frame) at a clean, well-lit table on the right. The left negative space displays an infographic structured as two graphic vertical pillars, illustrating the content of the two classes. Embedded bold Korean text on the pillars must detail the activities and counts: '미술교실: 초음파 사진 그리기 (12명)', '태교공예: 애착인형, 모빌 만들기 (15명)'. Clean lines, cool blue accents, professional, wide shot composition.",
+      "imageUrl": "/generated/img_1770356955136_87dsr.jpg",
+      "status": "approved",
+      "subtitle": "미술교실 (12명) & 태교공예 (15명)",
+      "duration": 19,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770357110477.wav",
+      "audioDuration": 16.731875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "모집 결과는 2026년 2월 23일(월)부터 25일(수) 사이에 개인별 SMS 통보로 안내될 예정입니다. 기타 궁금한 사항은 여수시 보건소 건강증진과 모자보건팀(061-659-4087)으로 문의하시면 친절하게 안내받으실 수 있습니다.",
+      "title": "신청 완료, 기다림의 시간",
+      "imagePrompt": "Wide shot, subject on the right, wide negative space on the left. The pregnant Korean woman is walking away from the health center desk, holding a pamphlet and smiling confidently. Cool blue tones dominate the scene. The left negative space holds a professional digital contact card graphic. Embedded bold Korean text must clearly state the outcome notification date and contact information: '대상 통보: 2026. 2. 23. ~ 2. 25. (SMS)', '문의처: 건강증진과 ☎ 061-659-4087'. High quality, professional graphic overlay, wide shot composition.",
+      "imageUrl": "/generated/img_1770356984343_g9ho29.jpg",
+      "status": "approved",
+      "subtitle": "문의: 061-659-4087",
+      "duration": 25,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770357133566.wav",
+      "audioDuration": 22.291875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "rec1VN2WS5lMSzWql",
+  "createdAt": "2026-02-06T05:57:56.950Z",
+  "updatedAt": "2026-02-06T05:57:56.950Z",
+  "videoPath": "/projects/rec1VN2WS5lMSzWql/video.webm",
+  "thumbnailPath": "/projects/rec1VN2WS5lMSzWql/thumbnail.jpg"
+}

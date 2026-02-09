@@ -1,10 +1,15 @@
 "use client";
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import clsx from "clsx";
-import { Play, Pause, RotateCw, RotateCcw, X, FileVideo, Wand2, Upload, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, Sparkles, Video as VideoIcon, ThumbsUp, Pencil, Film, Clock, Globe, Calendar, FileText, Music, Settings, MessageSquare, Heart, RefreshCw, Save, Trash2, FolderOpen, ChevronRight, ChevronDown, Info, Palette, LayoutTemplate, QrCode, List, Plus, Copy, ShieldCheck, Square } from 'lucide-react';
+import { Play, Pause, RotateCw, RotateCcw, X, FileVideo, Wand2, Upload, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, Sparkles, Video as VideoIcon, ThumbsUp, Pencil, Film, Clock, Globe, Calendar, FileText, Music, Settings, MessageSquare, Heart, RefreshCw, Save, Trash2, FolderOpen, ChevronRight, ChevronDown, Info, Palette, LayoutTemplate, QrCode, List, Plus, Copy, ShieldCheck, Square, History as HistoryIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import WebGPURenderer, { MediaAsset } from "@/components/WebGPURenderer";
 import NarrationStudio, { VOICE_DATA } from "@/components/NarrationStudio";
+import SNSUploadModal from "@/components/SNSUploadModal";
+import SNSManagerModal from "@/components/SNSManagerModal";
+import ImageCropModal from "@/components/ImageCropModal";
 import QRCode from 'qrcode';
+
+const NO_OP = () => { };
 
 interface Scene {
   imageUrl: string;
@@ -104,6 +109,13 @@ export interface CaptionConfig {
     };
   };
 }
+
+const ASPECT_RATIOS = [
+  { label: "16:9", width: 1920, height: 1080, description: "YouTube / TV" },
+  { label: "9:16", width: 1080, height: 1920, description: "Shorts / TikTok" },
+  { label: "1:1", width: 1080, height: 1080, description: "Instagram Feed" },
+  { label: "4:5", width: 1080, height: 1350, description: "Facebook / Insta Portrait" },
+] as const;
 
 const VISUAL_STYLES = [
   { id: "Photorealistic", label: "Photorealistic", image: "/images/styles/photorealistic.png", description: "Real world photo style" },
@@ -254,6 +266,7 @@ export default function Home() {
   const [isDragging, setIsDragging] = useState(false);
 
   const [scrapedPost, setScrapedPost] = useState<ScrapedPost | null>(null);
+  const [narrationLength, setNarrationLength] = useState<'Short' | 'Medium' | 'Long'>('Medium'); // New State
   const [postList, setPostList] = useState<ScrapedPost[]>([]);
   const [nextPageUrl, setNextPageUrl] = useState<string | null>(null);
 
@@ -359,6 +372,14 @@ export default function Home() {
   const [editSiteName, setEditSiteName] = useState("");
   const [editSiteUrl, setEditSiteUrl] = useState("");
 
+
+  const [selectedAspectRatio, setSelectedAspectRatio] = useState("16:9");
+  const [showSNSModal, setShowSNSModal] = useState(false);
+  const [saveMemo, setSaveMemo] = useState("");
+  const [showSNSManager, setShowSNSManager] = useState(false);
+  const selectedAspect = ASPECT_RATIOS.find(r => r.label === selectedAspectRatio) || ASPECT_RATIOS[0];
+
+
   // Load sites from Airtable on mount
   useEffect(() => {
     fetch('/api/sites')
@@ -448,9 +469,15 @@ export default function Home() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
 
   // AI Disclosure & Watermark State
+  const [expandedSection, setExpandedSection] = useState<string | null>('format'); // Changed to single string for consistency, assuming 'format' is the default
+  const [activeTab, setActiveTab] = useState<'edit' | 'preview'>('edit');
+
+  // AI Disclosure & Watermark State (Restored)
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
   const [watermarkUrl, setWatermarkUrl] = useState<string | null>(null);
   const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
+
+  const [previewQuality, setPreviewQuality] = useState<'high' | 'low'>('low'); // Default to Performance mode for preview
 
   // SNS Platform Selection
   type SNSPlatform = 'youtube' | 'youtube4k' | 'instagram' | 'tiktok' | 'facebook' | 'custom';
@@ -478,7 +505,34 @@ export default function Home() {
   const [showSubtitles, setShowSubtitles] = useState(true);
   const [showNarrationText, setShowNarrationText] = useState(true);
   const [subtitleColor, setSubtitleColor] = useState("#ffffff");
+  const [debouncedSubtitleColor, setDebouncedSubtitleColor] = useState("#ffffff");
   const [narrationColor, setNarrationColor] = useState("#e0e0e0");
+  const [debouncedNarrationColor, setDebouncedNarrationColor] = useState("#e0e0e0");
+
+  // New: Custom AI Prompt Injection
+  const [customAiPrompt, setCustomAiPrompt] = useState("");
+
+  // New: VFX Overlays
+  // New: VFX Overlays
+  const [overlayConfig, setOverlayConfig] = useState<any>({
+    lightLeak: { enabled: false, intensity: 0.5, colorTheme: 'warm' },
+    filmGrain: { enabled: false, intensity: 0.3, coarseness: 2 },
+    dustParticles: { enabled: false, density: 0.4, speed: 0.5 },
+    vignette: { enabled: false, intensity: 0.6, radius: 0.8 },
+    colorGrading: { enabled: false, brightness: 1.0, contrast: 1.0, saturation: 1.0, sepia: 0 },
+    bloom: { enabled: false, strength: 0.0, radius: 10, threshold: 0.8 }
+  });
+
+  // Scene Image Upload / Crop Modal state
+  const [cropModal, setCropModal] = useState<{
+    isOpen: boolean;
+    imageUrl: string;
+    sceneIndex: number;
+    targetW: number;
+    targetH: number;
+  } | null>(null);
+  const sceneFileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
+
   const [subtitleFont, setSubtitleFont] = useState("Pretendard");
   const [narrationFont, setNarrationFont] = useState("Pretendard");
   // Subtitle Effects
@@ -491,8 +545,21 @@ export default function Home() {
   // New Dynamic Subtitle Settings
   const [subtitlePreset, setSubtitlePreset] = useState<string>('custom');
   const [subtitleOpacity, setSubtitleOpacity] = useState(1.0);
+  const [subtitleBackgroundColor, setSubtitleBackgroundColor] = useState("#000000");
+  const [debouncedSubtitleBackgroundColor, setDebouncedSubtitleBackgroundColor] = useState("#000000");
+  const [subtitleBackgroundOpacity, setSubtitleBackgroundOpacity] = useState(0.0);
+  const [debouncedSubtitleBackgroundOpacity, setDebouncedSubtitleBackgroundOpacity] = useState(0.0);
   const [subtitleStrokeColor, setSubtitleStrokeColor] = useState('#000000');
   const [subtitleStrokeWidth, setSubtitleStrokeWidth] = useState(0);
+
+  // New: Narration Styling
+  const [narrationBackgroundColor, setNarrationBackgroundColor] = useState("#000000");
+  const [debouncedNarrationBackgroundColor, setDebouncedNarrationBackgroundColor] = useState("#000000");
+  const [narrationBackgroundOpacity, setNarrationBackgroundOpacity] = useState(0.6); // Default for ticker
+  const [debouncedNarrationBackgroundOpacity, setDebouncedNarrationBackgroundOpacity] = useState(0.6);
+
+  // New: Ticker Speed Control
+  const [tickerSpeed, setTickerSpeed] = useState<number>(1.0);
 
   const [showRenderSettings, setShowRenderSettings] = useState(false);
 
@@ -525,8 +592,7 @@ export default function Home() {
     }
   }, [showQrCode, qrUrl]);
 
-  // Render Settings Accordion State
-  const [expandedSection, setExpandedSection] = useState<string | null>("intro");
+
 
   // Intro/Outro State
   const [introMedia, setIntroMedia] = useState<MediaAsset | null>(null);
@@ -553,6 +619,32 @@ export default function Home() {
     }
   };
 
+  // Timeline Scrubber State
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [seekRequest, setSeekRequest] = useState<number | null>(null);
+
+  const handleProgress = useCallback((current: number, total: number) => {
+    if (!isScrubbing) {
+      setCurrentTime(current);
+      setTotalDuration(total);
+    }
+  }, [isScrubbing]);
+
+  const handleScrubStart = () => setIsScrubbing(true);
+  const handleScrubEnd = () => {
+    setSeekRequest(currentTime);
+    // Delay resetting scrubbing state to prevent the slider from jumping back 
+    // to the old time before the renderer has caught up with the seek.
+    setTimeout(() => {
+      setIsScrubbing(false);
+      setSeekRequest(null);
+    }, 500);
+  };
+  const handleScrubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setCurrentTime(parseFloat(e.target.value));
+  };
+
   const fontDisplayMap: Record<string, string> = {
     "Pretendard": "Pretendard (기본)",
     "Nanum Gothic": "나눔고딕",
@@ -576,6 +668,50 @@ export default function Home() {
   const handleRenderLog = useCallback((msg: string) => {
     setRenderLogs(prev => [...prev.slice(-10), msg]);
   }, []);
+
+  // Debounce Color Updates to prevent Max Update Depth Error in WebGPURenderer
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSubtitleColor(subtitleColor);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [subtitleColor]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNarrationColor(narrationColor);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [narrationColor]);
+
+  // Debounce Background Color Updates
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSubtitleBackgroundColor(subtitleBackgroundColor);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [subtitleBackgroundColor]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSubtitleBackgroundOpacity(subtitleBackgroundOpacity);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [subtitleBackgroundOpacity]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNarrationBackgroundColor(narrationBackgroundColor);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [narrationBackgroundColor]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedNarrationBackgroundOpacity(narrationBackgroundOpacity);
+    }, 200);
+    return () => clearTimeout(timer);
+  }, [narrationBackgroundOpacity]);
 
 
 
@@ -844,7 +980,7 @@ export default function Home() {
     }
   };
 
-  const handleSaveProject = async (overwrite: boolean) => {
+  const handleSaveProject = async (overwrite: boolean, archiveType: 'pre' | 'snapshot' = 'pre') => {
     setIsSaving(true);
     setShowSaveOptions(false);
 
@@ -926,8 +1062,11 @@ export default function Home() {
               subtitleSpeed, audioEnabled, aiDisclosureEnabled, watermarkUrl,
               selectedPlatform, customWidth, customHeight, imageAspectRatio,
               totalDuration, analysisMode, videoPurpose,
-              videoPath: fsData.project?.videoPath
-            }
+              videoPath: fsData.project?.videoPath,
+              // New Additions
+              saveMemo, narrationLength, scrapedPost
+            },
+            archiveType // Pass to API
           })
         });
         const airtableData = await airtableRes.json();
@@ -949,6 +1088,8 @@ export default function Home() {
       setIsSaving(false);
     }
   };
+
+
 
   const handleSelectPost = (post: ScrapedPost) => {
     // 1. Fix common scraping duplication in title (e.g., "Title Title" or "TitleTitle")
@@ -995,6 +1136,7 @@ export default function Home() {
       }
     });
     setSelectedFiles(initialFiles);
+    setCustomAiPrompt(""); // Reset custom prompt
   };
 
 
@@ -1091,7 +1233,9 @@ export default function Home() {
           imageMood,
           imageInterpretation,
           allowImageVariation, // Pass this new setting
-          sceneCount
+          sceneCount,
+          narrationLength, // Pass narrationLength
+          customPrompt: customAiPrompt // Pass custom prompt
         })
       });
       const data = await res.json();
@@ -1107,7 +1251,8 @@ export default function Home() {
       }
 
       setAnalysisResult(data);
-      if (data.summary) {
+      if (data.summary && !projectTitle && !scrapedPost?.title) {
+        // Only auto-set title from summary if we don't have a title or a scraped post
         setProjectTitle(data.summary);
       }
 
@@ -1155,6 +1300,8 @@ export default function Home() {
           videoPurpose,
           allowImageVariation, // Save this setting
           sceneCount,
+          narrationLength, // Save narrationLength
+          customPrompt: customAiPrompt, // Save custom prompt
           scrapedPost: scrapedPost ? {
             title: scrapedPost.title,
             link: scrapedPost.link,
@@ -1167,7 +1314,7 @@ export default function Home() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             id: currentProjectId,
-            name: data.summary || scrapedPost?.title || "New Project",
+            name: scrapedPost?.title || projectTitle || data.summary || "New Project",
             sceneItems: newScenes,
             settings: autoSaveSettings
           })
@@ -1382,7 +1529,67 @@ export default function Home() {
     }
   };
 
+  const handleMoveScene = (index: number, direction: -1 | 1) => {
+    const newIndex = index + direction;
+    if (newIndex < 0 || newIndex >= sceneItems.length) return;
 
+    const updated = [...sceneItems];
+    const [moved] = updated.splice(index, 1);
+    updated.splice(newIndex, 0, moved);
+    setSceneItems(updated);
+  };
+
+  const handleDeleteScene = (index: number) => {
+    if (sceneItems.length <= 1) return; // Keep at least 1 scene
+    if (!confirm(`Scene ${index + 1}을 삭제하시겠습니까?`)) return;
+    setSceneItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleAddEmptyScene = () => {
+    setSceneItems(prev => [
+      ...prev,
+      {
+        text: '',
+        subtitle: '',
+        title: `Scene ${prev.length + 1}`,
+        imageUrl: '',
+        imagePrompt: '',
+        status: 'pending' as any,
+        duration: 8,
+        transition: 'fade' as any,
+        audioUrl: null,
+        audioDuration: 0,
+        isEnabled: true,
+        isAudioGenerating: false,
+      }
+    ]);
+  };
+
+
+  const handleSceneImageUpload = (idx: number, file: File) => {
+    const url = URL.createObjectURL(file);
+    const img = new Image();
+    img.onload = () => {
+      const platform = selectedPlatform;
+      const tW = platform === 'custom' ? customWidth : platformConfigs[platform].width;
+      const tH = platform === 'custom' ? customHeight : platformConfigs[platform].height;
+      const imgAspect = (img.naturalWidth / img.naturalHeight).toFixed(2);
+      const targetAspect = (tW / tH).toFixed(2);
+
+      if (imgAspect === targetAspect) {
+        // Aspect ratio matches → apply directly
+        setSceneItems(prev => {
+          const updated = [...prev];
+          updated[idx] = { ...updated[idx], imageUrl: url, status: 'approved' as any };
+          return updated;
+        });
+      } else {
+        // Mismatch → show crop modal
+        setCropModal({ isOpen: true, imageUrl: url, sceneIndex: idx, targetW: tW, targetH: tH });
+      }
+    };
+    img.src = url;
+  };
 
   const handlePreviewVoice = async (voiceId: string) => {
     if (previewAudioRef.current) {
@@ -1459,6 +1666,7 @@ export default function Home() {
     // If no project title exists, set one and try to save automatically
     let titleToSave = projectTitle;
     if (!titleToSave) {
+      // Prioritize scraped post title, else fallback
       titleToSave = scrapedPost?.title || "Auto-Saved Project " + new Date().toLocaleTimeString();
       setProjectTitle(titleToSave);
     }
@@ -1504,6 +1712,30 @@ export default function Home() {
       }
     } catch (e: any) {
       alert("Failed to load history: " + e.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleDeleteHistoryVersion = async (historyTimestamp: string) => {
+    if (!historyProjectId) return;
+    if (!confirm("Are you sure you want to delete this version history entry? This cannot be undone.")) return;
+
+    setIsProcessing(true);
+    try {
+      const res = await fetch(`/api/projects?id=${historyProjectId}&historyTimestamp=${encodeURIComponent(historyTimestamp)}`, {
+        method: 'DELETE'
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Update local state to remove the item
+        setProjectHistory(prev => prev.filter(h => h.timestamp !== historyTimestamp));
+        alert("Version history deleted successfully.");
+      } else {
+        throw new Error(data.error || "Delete failed");
+      }
+    } catch (e: any) {
+      alert("Failed to delete history: " + e.message);
     } finally {
       setIsProcessing(false);
     }
@@ -1661,6 +1893,35 @@ export default function Home() {
     }
   };
 
+  const handleUpdateProjectName = async (projId: string, newName: string) => {
+    if (!newName.trim()) return;
+    setIsProcessing(true);
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: projId,
+          name: newName.trim(),
+          sceneItems: [], // Not updating scenes
+          settings: {}    // Not updating settings (preserve existing)
+        })
+      });
+      const data = await res.json();
+      if (data.success) {
+        setSavedProjects(prev => prev.map((p: any) => p.id === projId ? { ...p, name: newName.trim() } : p));
+        setEditingProjectId(null);
+        alert("Project renamed successfully.");
+      } else {
+        throw new Error(data.error || "Update failed");
+      }
+    } catch (e: any) {
+      alert("Rename failed: " + e.message);
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleToggleBGMPreview = () => {
     if (isPreviewingBGM) {
       bgmPreviewRef.current?.pause();
@@ -1742,19 +2003,42 @@ export default function Home() {
             </h2>
             <div className="flex gap-3">
               <button
-                onClick={() => handleNavigationWithSaveCheck(() => setShowServerGallery(true))}
+                onClick={() => handleNavigationWithSaveCheck(() => {
+                  setSelectedProject(null);
+                  setExpandedProjectTitle(null);
+                  setEditingProjectId(null);
+                  setShowServerGallery(true);
+                })}
                 className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-900/20 transition-all flex items-center gap-2"
               >
                 <Film className="w-3 h-3" /> Gallery
               </button>
               <button
                 onClick={handleOpenLoadModal}
-
                 disabled={isProcessing}
                 className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold transition-all flex items-center gap-2"
               >
                 <Upload className="w-3 h-3" /> Load
               </button>
+
+
+
+              <button
+                onClick={() => setShowSNSManager(true)}
+                className="px-4 py-2 rounded-lg bg-white/5 border border-white/10 hover:bg-white/10 text-xs font-bold transition-all flex items-center gap-2"
+                title="Manage Integrations"
+              >
+                <Settings className="w-3 h-3" /> Settings
+              </button>
+
+              {currentProjectId && (
+                <button
+                  onClick={() => handleSaveProject(false)}
+                  className="px-4 py-2 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold shadow-lg shadow-indigo-500/20 transition-all flex items-center gap-2"
+                >
+                  <Copy className="w-3 h-3" /> Copy Project
+                </button>
+              )}
 
               <button
                 onClick={() => {
@@ -1777,7 +2061,7 @@ export default function Home() {
                 className="px-4 py-2 rounded-lg bg-pink-600 hover:bg-pink-500 text-white text-xs font-bold shadow-lg shadow-pink-900/20 transition-all flex items-center gap-2"
               >
                 {isProcessing ? <Loader2 className="w-3 h-3 animate-spin" /> : currentProjectId ? <Save className="w-3 h-3" /> : <Plus className="w-3 h-3" />}
-                {currentProjectId ? 'Update Project' : 'Create Project'}
+                {currentProjectId ? 'Save' : 'Create Project'}
               </button>
             </div>
           </div>
@@ -1844,6 +2128,7 @@ export default function Home() {
                 <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
               </div>
             </div>
+
             <div className="flex justify-between items-start pt-2">
               {/* Filter UI */}
               <div className="flex-1 mr-4 bg-black/20 p-3 rounded-xl border border-white/5">
@@ -2213,6 +2498,32 @@ export default function Home() {
                     </div>
                   </div>
 
+                  {/* Narration Length Selector */}
+                  <div className="mt-4">
+                    <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Narration Length</label>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[
+                        { id: 'Short', label: 'Short', desc: 'Fast (~2 sent.)' },
+                        { id: 'Medium', label: 'Medium', desc: 'Balanced (~3-4 sent.)' },
+                        { id: 'Long', label: 'Long', desc: 'Detailed (5+ sent.)' },
+                      ].map((opt) => (
+                        <button
+                          key={opt.id}
+                          onClick={() => setNarrationLength(opt.id as any)}
+                          className={clsx(
+                            "flex flex-col items-center justify-center p-2 rounded-lg border transition-all h-14",
+                            narrationLength === opt.id
+                              ? "bg-white text-black border-white"
+                              : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10 hover:text-white"
+                          )}
+                        >
+                          <div className="text-xs font-bold leading-none">{opt.label}</div>
+                          <div className="text-[9px] opacity-70 mt-1">{opt.desc}</div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Album Mode Options */}
                   {analysisMode === 'album' && (
                     <div className="mt-4 p-4 bg-pink-500/5 border border-pink-500/20 rounded-xl animate-in fade-in slide-in-from-top-2">
@@ -2234,126 +2545,139 @@ export default function Home() {
                     </div>
                   )}
                 </div>
+              </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Published Date</label>
-                  <p className="text-gray-300 text-sm">{scrapedPost.date}</p>
-                </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Published Date</label>
+                <p className="text-gray-300 text-sm">{scrapedPost.date}</p>
+              </div>
 
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Images ({scrapedPost.images?.length || 0})</label>
-                  {scrapedPost.images && scrapedPost.images.length > 0 ? (
-                    <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
-                      {scrapedPost.images.map((img, i) => (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          key={i}
-                          src={img}
-                          onClick={() => setPreviewImage(img)}
-                          className="h-24 w-auto rounded-lg border border-white/10 object-cover cursor-pointer hover:opacity-80 hover:scale-105 transition-all"
-                          alt="scraped content"
-                        />
-                      ))}
-                    </div>
-                  ) : <span className="text-gray-500 text-xs italic">No images found</span>}
-                </div>
-
-                <div>
-                  <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Content (Editable)</label>
-                  <textarea
-                    value={scrapedPost.content}
-                    onChange={(e) => setScrapedPost({ ...scrapedPost, content: e.target.value })}
-                    className="w-full text-gray-300 text-sm leading-relaxed whitespace-pre-wrap h-80 overflow-y-auto custom-scrollbar p-3 bg-white/5 rounded-lg border border-white/5 focus:border-purple-500 focus:bg-white/10 outline-none transition-all resize-y"
-                    placeholder="Content text..."
-                  />
-                </div>
-
-                {/* File Selection Area */}
-                <div className="pt-4 border-t border-white/5">
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="text-xs font-bold text-gray-500 uppercase block">
-                      Attached Files ({scrapedPost.files?.length || 0})
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] text-gray-500 italic">or Drag & Drop</span>
-                      <label className="cursor-pointer bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-[10px] flex items-center gap-1 transition-colors">
-                        <Upload className="w-3 h-3" />
-                        <span>Upload File</span>
-                        <input
-                          type="file"
-                          multiple
-                          className="hidden"
-                          onChange={(e) => {
-                            if (e.target.files) {
-                              const incomingFiles = Array.from(e.target.files);
-                              const newImages: string[] = [];
-                              const newFiles: { name: string, url: string }[] = [];
-
-                              incomingFiles.forEach(f => {
-                                const url = URL.createObjectURL(f);
-                                const isImage = f.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name);
-
-                                if (isImage) {
-                                  newImages.push(url);
-                                }
-                                // Add all files to the file list regardless of type (User Request)
-                                newFiles.push({ name: f.name, url });
-                              });
-
-                              setScrapedPost(prev => prev ? ({
-                                ...prev,
-                                images: [...(prev.images || []), ...newImages],
-                                files: [...(prev.files || []), ...newFiles]
-                              }) : null);
-                            }
-                          }}
-                        />
-                      </label>
-                      <span className="text-xs font-normal text-yellow-500">* PDF recommended</span>
-                    </div>
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Images ({scrapedPost.images?.length || 0})</label>
+                {scrapedPost.images && scrapedPost.images.length > 0 ? (
+                  <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
+                    {scrapedPost.images.map((img, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={img}
+                        onClick={() => setPreviewImage(img)}
+                        className="h-24 w-auto rounded-lg border border-white/10 object-cover cursor-pointer hover:opacity-80 hover:scale-105 transition-all"
+                        alt="scraped content"
+                      />
+                    ))}
                   </div>
-                  {(scrapedPost.files && scrapedPost.files.length > 0) && (
-                    <div className="space-y-2">
-                      {scrapedPost.files.map((file, idx) => (
-                        <label key={idx} className={clsx(
-                          "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
-                          selectedFiles.has(file.url)
-                            ? "bg-blue-500/10 border-blue-500/50"
-                            : "bg-white/5 border-white/5 hover:bg-white/10"
-                        )}>
-                          <input
-                            type="checkbox"
-                            checked={selectedFiles.has(file.url)}
-                            onChange={(e) => {
-                              const newSet = new Set(selectedFiles);
-                              if (e.target.checked) newSet.add(file.url);
-                              else newSet.delete(file.url);
-                              setSelectedFiles(newSet);
-                            }}
-                            className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-2">
-                              <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
-                              <a
-                                href={file.url}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                onClick={(e) => e.stopPropagation()}
-                                className={clsx(
-                                  "text-sm truncate font-medium hover:underline hover:text-blue-400 decoration-blue-400/50 underline-offset-4",
-                                  selectedFiles.has(file.url) ? "text-blue-200" : "text-gray-300"
-                                )}>{file.name}</a>
-                            </div>
-                          </div>
-                          {file.name.toLowerCase().endsWith('.pdf') && (
-                            <div className="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded font-mono">PDF</div>
-                          )}
-                        </label>
-                      ))}
-                    </div>
-                  )}
+                ) : <span className="text-gray-500 text-xs italic">No images found</span>}
+              </div>
+
+              <div>
+                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Content (Editable)</label>
+                <textarea
+                  value={scrapedPost.content}
+                  onChange={(e) => setScrapedPost(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
+                  className="w-full text-gray-300 text-sm leading-relaxed whitespace-pre-wrap h-80 overflow-y-auto custom-scrollbar p-3 bg-white/5 rounded-lg border border-white/5 focus:border-purple-500 focus:bg-white/10 outline-none transition-all resize-y"
+                  placeholder="Content text..."
+                />
+              </div>
+
+              {/* New: Custom AI Prompt Injection */}
+              <div>
+                <label className="text-xs font-bold text-purple-400 uppercase mb-1 flex items-center gap-2">
+                  <Sparkles className="w-3 h-3" /> Additional AI Instructions (Optional)
+                </label>
+                <textarea
+                  value={customAiPrompt}
+                  onChange={(e) => setCustomAiPrompt(e.target.value)}
+                  className="w-full text-white text-sm h-24 p-3 bg-purple-900/10 rounded-lg border border-purple-500/30 focus:border-purple-500 focus:bg-purple-900/20 outline-none transition-all resize-y placeholder-gray-500"
+                  placeholder="E.g., Make the tone very sarcastic, Mention the company name 'Acme' in every scene, Use a question for every scene title..."
+                />
+              </div>
+
+              {/* File Selection Area */}
+              <div className="pt-4 border-t border-white/5">
+                <div className="flex justify-between items-center mb-2">
+                  <label className="text-xs font-bold text-gray-500 uppercase block">
+                    Attached Files ({scrapedPost.files?.length || 0})
+                  </label>
+                  <div className="flex items-center gap-2">
+                    <span className="text-[10px] text-gray-500 italic">or Drag & Drop</span>
+                    <label className="cursor-pointer bg-white/10 hover:bg-white/20 text-white px-2 py-1 rounded text-[10px] flex items-center gap-1 transition-colors">
+                      <Upload className="w-3 h-3" />
+                      <span>Upload File</span>
+                      <input
+                        type="file"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          if (e.target.files) {
+                            const incomingFiles = Array.from(e.target.files);
+                            const newImages: string[] = [];
+                            const newFiles: { name: string, url: string }[] = [];
+
+                            incomingFiles.forEach(f => {
+                              const url = URL.createObjectURL(f);
+                              const isImage = f.type.startsWith('image/') || /\.(jpg|jpeg|png|gif|webp)$/i.test(f.name);
+
+                              if (isImage) {
+                                newImages.push(url);
+                              }
+                              // Add all files to the file list regardless of type (User Request)
+                              newFiles.push({ name: f.name, url });
+                            });
+
+                            setScrapedPost(prev => prev ? ({
+                              ...prev,
+                              images: [...(prev.images || []), ...newImages],
+                              files: [...(prev.files || []), ...newFiles]
+                            }) : null);
+                          }
+                        }}
+                      />
+                    </label>
+                    <span className="text-xs font-normal text-yellow-500">* PDF recommended</span>
+                  </div>
                 </div>
+                {(scrapedPost.files && scrapedPost.files.length > 0) && (
+                  <div className="space-y-2">
+                    {scrapedPost.files.map((file, idx) => (
+                      <label key={idx} className={clsx(
+                        "flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-all",
+                        selectedFiles.has(file.url)
+                          ? "bg-blue-500/10 border-blue-500/50"
+                          : "bg-white/5 border-white/5 hover:bg-white/10"
+                      )}>
+                        <input
+                          type="checkbox"
+                          checked={selectedFiles.has(file.url)}
+                          onChange={(e) => {
+                            const newSet = new Set(selectedFiles);
+                            if (e.target.checked) newSet.add(file.url);
+                            else newSet.delete(file.url);
+                            setSelectedFiles(newSet);
+                          }}
+                          className="w-4 h-4 rounded border-gray-600 bg-gray-700 text-blue-500 focus:ring-blue-500 focus:ring-offset-0"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <FileText className="w-4 h-4 text-gray-400 flex-shrink-0" />
+                            <a
+                              href={file.url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={(e) => e.stopPropagation()}
+                              className={clsx(
+                                "text-sm truncate font-medium hover:underline hover:text-blue-400 decoration-blue-400/50 underline-offset-4",
+                                selectedFiles.has(file.url) ? "text-blue-200" : "text-gray-300"
+                              )}>{file.name}</a>
+                          </div>
+                        </div>
+                        {file.name.toLowerCase().endsWith('.pdf') && (
+                          <div className="px-2 py-0.5 bg-red-500/20 text-red-300 text-[10px] rounded font-mono">PDF</div>
+                        )}
+                      </label>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Estimated Cost Display */}
@@ -2361,22 +2685,30 @@ export default function Home() {
                 <div className="text-right">
                   <div className="text-[10px] text-gray-500 uppercase font-bold tracking-wider mb-0.5">Est. Budget Breakdown</div>
                   <div className="flex gap-4">
-                    <div className="text-right">
-                      <span className="block text-[9px] text-gray-500">Scenario</span>
-                      <span className="block text-xs text-gray-300 font-mono">~₩{Math.round(((scrapedPost.content.length * 1.5) / 1000000 * 0.075 + 0.002) * 1450).toLocaleString()}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-[9px] text-gray-500">Images (x8)</span>
-                      <span className="block text-xs text-gray-300 font-mono">~₩{Math.round(8 * 58).toLocaleString()}</span>
-                    </div>
-                    <div className="text-right">
-                      <span className="block text-[9px] text-gray-500">Narration (x8)</span>
-                      <span className="block text-xs text-gray-300 font-mono">~₩{Math.round(8 * 20).toLocaleString()}</span>
-                    </div>
-                    <div className="text-right pl-4 border-l border-white/10">
-                      <span className="block text-[9px] text-purple-400 font-bold">TOTAL</span>
-                      <span className="block text-xs text-purple-300 font-mono font-bold">~₩{Math.round((((scrapedPost.content.length * 1.5) / 1000000 * 0.075 + 0.002) * 1450) + (8 * 58) + (8 * 20)).toLocaleString()}</span>
-                    </div>
+                    {/* Helper to calculate effective count */}
+                    {(() => {
+                      const effectiveCount = sceneCount === 'AUTO' ? 8 : (sceneCount as number);
+                      return (
+                        <>
+                          <div className="text-right">
+                            <span className="block text-[9px] text-gray-500">Scenario</span>
+                            <span className="block text-xs text-gray-300 font-mono">~₩{Math.round((((scrapedPost?.content?.length || 0) * 1.5) / 1000000 * 0.075 + 0.002) * 1450).toLocaleString()}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[9px] text-gray-500">Images (x{effectiveCount})</span>
+                            <span className="block text-xs text-gray-300 font-mono">~₩{Math.round(effectiveCount * 58).toLocaleString()}</span>
+                          </div>
+                          <div className="text-right">
+                            <span className="block text-[9px] text-gray-500">Narration (x{effectiveCount})</span>
+                            <span className="block text-xs text-gray-300 font-mono">~₩{Math.round(effectiveCount * 20).toLocaleString()}</span>
+                          </div>
+                          <div className="text-right pl-4 border-l border-white/10">
+                            <span className="block text-[9px] text-purple-400 font-bold">TOTAL</span>
+                            <span className="block text-xs text-purple-300 font-mono font-bold">~₩{Math.round(((((scrapedPost?.content?.length || 0) * 1.5) / 1000000 * 0.075 + 0.002) * 1450) + (effectiveCount * 58) + (effectiveCount * 20)).toLocaleString()}</span>
+                          </div>
+                        </>
+                      );
+                    })()}
                   </div>
                 </div>
               </div>
@@ -2788,6 +3120,18 @@ export default function Home() {
                       "w-40 h-28 bg-black rounded-lg flex items-center justify-center relative overflow-hidden shadow-lg group border transition-all",
                       item.status === 'generating' ? "border-purple-500/50 animate-pulse bg-purple-500/5" : "border-transparent"
                     )}>
+                      {/* Hidden file input for image upload */}
+                      <input
+                        type="file"
+                        accept="image/*"
+                        ref={el => { sceneFileInputRefs.current[idx] = el; }}
+                        className="hidden"
+                        onChange={(e) => {
+                          const file = e.target.files?.[0];
+                          if (file) handleSceneImageUpload(idx, file);
+                          e.target.value = ''; // Reset
+                        }}
+                      />
                       {item.imageUrl ? (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -2797,8 +3141,19 @@ export default function Home() {
                             alt={`Scene ${idx + 1}`}
                             onClick={() => setPreviewImage(item.imageUrl)}
                           />
-                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center pointer-events-none">
-                            <span className="text-white text-xs font-bold flex items-center gap-1"><Sparkles className="w-3 h-3" /> View</span>
+                          <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                            <button
+                              onClick={(e) => { e.stopPropagation(); setPreviewImage(item.imageUrl); }}
+                              className="text-white text-xs font-bold flex items-center gap-1 bg-black/30 px-2 py-1 rounded hover:bg-black/50 transition-colors"
+                            >
+                              <Sparkles className="w-3 h-3" /> View
+                            </button>
+                            <button
+                              onClick={(e) => { e.stopPropagation(); sceneFileInputRefs.current[idx]?.click(); }}
+                              className="text-white text-xs font-bold flex items-center gap-1 bg-black/30 px-2 py-1 rounded hover:bg-black/50 transition-colors"
+                            >
+                              <Upload className="w-3 h-3" /> Replace
+                            </button>
                           </div>
                         </>
                       ) : item.status === 'generating' ? (
@@ -2807,7 +3162,13 @@ export default function Home() {
                           <span className="text-xs font-bold animate-pulse">Generating...</span>
                         </div>
                       ) : (
-                        <ImageIcon className="text-gray-700 w-8 h-8" />
+                        <button
+                          onClick={() => sceneFileInputRefs.current[idx]?.click()}
+                          className="flex flex-col items-center gap-1 text-gray-600 hover:text-gray-400 transition-colors cursor-pointer"
+                        >
+                          <Upload className="w-6 h-6" />
+                          <span className="text-[10px] font-bold">Upload</span>
+                        </button>
                       )}
                       {/* Status Badge */}
                       {item.status === 'approved' && <div className="absolute top-2 right-2 bg-green-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow z-10">APPROVED</div>}
@@ -2836,6 +3197,35 @@ export default function Home() {
                                 {item.isEnabled !== false ? "ON" : "OFF"}
                               </span>
                             </label>
+
+                            {/* Move Buttons */}
+                            <div className="flex bg-black/20 rounded border border-white/5">
+                              <button
+                                onClick={() => handleDeleteScene(idx)}
+                                disabled={sceneItems.length <= 1}
+                                className="px-1.5 py-0.5 hover:bg-red-500/20 hover:text-red-400 disabled:opacity-30 disabled:cursor-not-allowed border-r border-white/5 transition-colors"
+                                title="Delete Scene"
+                              >
+                                <Trash2 className="w-3 h-3 text-gray-400" />
+                              </button>
+                              <button
+                                onClick={() => handleMoveScene(idx, -1)}
+                                disabled={idx === 0}
+                                className="px-1.5 py-0.5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed border-r border-white/5 transition-colors"
+                                title="Move Up"
+                              >
+                                <ArrowUp className="w-3 h-3 text-gray-400" />
+                              </button>
+                              <button
+                                onClick={() => handleMoveScene(idx, 1)}
+                                disabled={idx === sceneItems.length - 1}
+                                className="px-1.5 py-0.5 hover:bg-white/10 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+                                title="Move Down"
+                              >
+                                <ArrowDown className="w-3 h-3 text-gray-400" />
+                              </button>
+                            </div>
+
                             <select
                               value={item.transition}
                               onChange={(e) => {
@@ -2865,6 +3255,13 @@ export default function Home() {
 
                               <optgroup label="Style">
                                 <option value="shake">Shake</option>
+                              </optgroup>
+
+                              <optgroup label="Cinematic">
+                                <option value="zoom_blur">Zoom Blur (Speed w/ Glow)</option>
+                                <option value="motion_wipe">Motion Wipe (w/ Trails)</option>
+                                <option value="luma_fade">Luma Dissolve (Tech Fade)</option>
+                                <option value="glitch">Glitch (RGB Split)</option>
                               </optgroup>
                             </select>
                             <span className="text-xs text-gray-500 font-mono">{item.duration}s</span>
@@ -2950,6 +3347,15 @@ export default function Home() {
                   </div>
                 ))}
               </div>
+
+              {/* Add Empty Scene Button */}
+              <button
+                onClick={handleAddEmptyScene}
+                className="w-full py-3 border-2 border-dashed border-white/10 hover:border-purple-500/50 rounded-xl text-gray-400 hover:text-purple-300 flex items-center justify-center gap-2 transition-all hover:bg-purple-500/5"
+              >
+                <Plus className="w-4 h-4" />
+                <span className="text-sm font-bold">Add Empty Scene</span>
+              </button>
 
               <button
                 onClick={() => {
@@ -3113,6 +3519,7 @@ export default function Home() {
                     voiceStyle={voiceStyle}
                     narrationSpeed={1.0} // Baked via Prompt
                     narrationTone={narrationTone}
+                    tickerSpeed={tickerSpeed} // Add Ticker Speed
                     subtitleSpeed={subtitleSpeed}
                     aiDisclosureEnabled={aiDisclosureEnabled}
                     watermarkUrl={watermarkUrl}
@@ -3126,6 +3533,10 @@ export default function Home() {
                     narrationColor={narrationColor}
                     subtitleFont={subtitleFont}
                     narrationFont={narrationFont}
+                    subtitleBackgroundColor={debouncedSubtitleBackgroundColor}
+                    subtitleBackgroundOpacity={debouncedSubtitleBackgroundOpacity}
+                    narrationBackgroundColor={debouncedNarrationBackgroundColor}
+                    narrationBackgroundOpacity={debouncedNarrationBackgroundOpacity}
                     subtitleEffectStyle={subtitleEffectStyle}
                     subtitleEntranceAnimation={subtitleEntranceAnimation}
                     subtitleExitAnimation={subtitleExitAnimation}
@@ -3142,6 +3553,7 @@ export default function Home() {
                     qrCodePosition={qrCodePosition}
                     scaleMode={imageAspectRatio === '16:9' ? 'contain' : 'cover'}
                     captionConfig={captionConfig}
+                    overlayConfig={overlayConfig}
                     previewMode={false}
                     onComplete={handleRenderComplete}
                     onLog={handleRenderLog}
@@ -3342,10 +3754,21 @@ export default function Home() {
                                   <a
                                     href={proj.videoPath}
                                     download={`${proj.title || "project"}.webm`}
-                                    className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-center text-xs font-bold text-white transition-colors"
+                                    className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-center text-xs font-bold text-white transition-colors flex items-center justify-center gap-1"
                                   >
-                                    Download
+                                    <VideoIcon className="w-3 h-3" /> Download
                                   </a>
+                                  <button
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedProject(proj); // Select the project
+                                      setShowSNSModal(true); // Open Modal
+                                    }}
+                                    className="px-3 py-2 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded-lg transition-colors border border-red-600/20 flex items-center justify-center"
+                                    title="Upload to YouTube"
+                                  >
+                                    <Upload className="w-3 h-3" />
+                                  </button>
                                   <button
                                     onClick={(e) => handleDeleteProject(proj.id, e)}
                                     className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors border border-red-500/20 shadow-none hover:shadow-red-500/20"
@@ -3566,37 +3989,81 @@ export default function Home() {
                 </div>
 
                 {/* Actions */}
-                <div className="p-8 bg-black/20 border-t border-white/10 grid grid-cols-2 gap-4">
-                  <a
-                    href={selectedProject.videoPath}
-                    download={`${selectedProject.title || "video"}.webm`}
-                    className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-center font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5"
-                  >
-                    <VideoIcon className="w-4 h-4" /> Download Video
-                  </a>
-                  <button
-                    onClick={() => {
-                      if (selectedProject.scenes) {
-                        setSceneItems(selectedProject.scenes);
-                        setProjectTitle(selectedProject.title || "");
-                        setShowServerGallery(false);
-                        setSelectedProject(null);
-                        setAnalysisResult({
-                          summary: selectedProject.title,
-                          scenes: [],
-                          imageAnalysis: { summary: "Loaded from gallery", visualStyle: "Auto", dominantColors: [] },
-                          consistency: { character: "Loaded", theme: "Loaded" },
-                          suggestedStyles: []
-                        });
-                        alert("Project items loaded for editing!");
-                      } else {
-                        alert("This project was saved without scene data and cannot be re-edited.");
-                      }
-                    }}
-                    className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
-                  >
-                    <Pencil className="w-4 h-4" /> Re-edit
-                  </button>
+                <div className="p-8 bg-black/20 border-t border-white/10">
+                  <div className="grid grid-cols-3 gap-4 mb-8">
+                    <a
+                      href={selectedProject.videoPath}
+                      download={`${selectedProject.title || "video"}.webm`}
+                      className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-center font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5"
+                    >
+                      <VideoIcon className="w-4 h-4" /> Download Video
+                    </a>
+                    <button
+                      onClick={() => setShowSNSModal(true)}
+                      className="py-3 bg-red-600/80 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 shadow-lg shadow-red-900/20"
+                    >
+                      <Upload className="w-4 h-4" /> Upload to YouTube
+                    </button>
+                    <button
+                      onClick={() => {
+                        if (selectedProject.scenes) {
+                          setSceneItems(selectedProject.scenes);
+                          setProjectTitle(selectedProject.title || "");
+                          setShowServerGallery(false);
+                          setSelectedProject(null);
+                          setAnalysisResult({
+                            summary: selectedProject.title,
+                            scenes: [],
+                            imageAnalysis: { summary: "Loaded from gallery", visualStyle: "Auto", dominantColors: [] },
+                            consistency: { character: "Loaded", theme: "Loaded" },
+                            suggestedStyles: []
+                          });
+                          alert("Project items loaded for editing!");
+                        } else {
+                          alert("This project was saved without scene data and cannot be re-edited.");
+                        }
+                      }}
+                      className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
+                    >
+                      <Pencil className="w-4 h-4" /> Re-edit
+                    </button>
+                  </div>
+
+                  {/* Upload History */}
+                  {selectedProject.uploads && selectedProject.uploads.length > 0 && (
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2">
+                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">YouTube Upload History</h4>
+                        <div className="flex-1 h-px bg-white/5"></div>
+                      </div>
+                      <div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 divide-y divide-white/5 max-h-60 overflow-y-auto custom-scrollbar">
+                        {selectedProject.uploads.map((upload: any, idx: number) => (
+                          <div key={idx} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className="w-10 h-10 rounded-full bg-red-600/20 flex items-center justify-center text-red-500">
+                                <VideoIcon className="w-5 h-5" />
+                              </div>
+                              <div>
+                                <div className="text-sm font-bold text-white">Uploaded to YouTube</div>
+                                <div className="text-xs text-gray-500 flex items-center gap-2">
+                                  <span>{new Date(upload.timestamp).toLocaleString()}</span>
+                                  {upload.channelId && <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400">{upload.channelId}</span>}
+                                </div>
+                              </div>
+                            </div>
+                            <a
+                              href={`https://youtu.be/${upload.videoId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2"
+                            >
+                              Watch <ChevronRight className="w-3 h-3" />
+                            </a>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
 
@@ -3637,121 +4104,113 @@ export default function Home() {
                       <div key={idx} className="bg-white/5 border border-white/5 p-4 rounded-xl flex justify-between items-center group">
                         <div>
                           <div className="text-sm font-bold text-gray-200">
-                            Version {projectHistory.length - idx}
+                            {hv.name || `Version ${projectHistory.length - idx}`}
                           </div>
                           <div className="text-[10px] text-gray-500 flex items-center gap-2 mt-1">
                             <Clock className="w-3 h-3" /> {new Date(hv.timestamp || 0).toLocaleString()}
                           </div>
                         </div>
-                        <button
-                          onClick={() => handleRestoreVersion(hv)}
-                          className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
-                        >
-                          Restore
-                        </button>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => handleDeleteHistoryVersion(hv.timestamp || "")}
+                            className="px-2 py-1.5 bg-red-600/20 hover:bg-red-600 text-red-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
+                            title="Delete Version"
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </button>
+                          <button
+                            onClick={() => handleRestoreVersion(hv)}
+                            className="px-3 py-1.5 bg-indigo-600/20 hover:bg-indigo-600 text-indigo-400 hover:text-white text-[10px] font-bold rounded-lg transition-all"
+                          >
+                            Restore
+                          </button>
+                        </div>
                       </div>
                     ))
                   )
                 ) : (
                   /* Grouped Projects View */
-                  Object.entries(
-                    savedProjects.reduce((acc: any, proj: any) => {
-                      const name = proj.name || "Untitled Project";
-                      if (!acc[name]) acc[name] = [];
-                      acc[name].push(proj);
-                      return acc;
-                    }, {})
-                  ).length === 0 ? (
+                  /* Flat Projects View */
+                  savedProjects.length === 0 ? (
                     <div className="text-center py-10 text-gray-500">
                       <p>No saved projects found.</p>
                     </div>
                   ) : (
-                    Object.entries(
-                      savedProjects.reduce((acc: any, proj: any) => {
-                        const name = proj.name || "Untitled Project";
-                        if (!acc[name]) acc[name] = [];
-                        acc[name].push(proj);
-                        return acc;
-                      }, {})
-                    ).sort((a: any, b: any) => {
-                      // Sort groups by the latest project in each group
-                      const latestA = Math.max(...(a[1] as any[]).map((p: any) => new Date(p.updatedAt || p.createdAt).getTime()));
-                      const latestB = Math.max(...(b[1] as any[]).map((p: any) => new Date(p.updatedAt || p.createdAt).getTime()));
-                      return latestB - latestA;
-                    }).map(([name, groupItems]: [string, any]) => (
-                      <div key={name} className="space-y-1">
-                        {/* Group Header (Folder) */}
-                        <button
-                          onClick={() => setExpandedProjectName(expandedProjectName === name ? null : name)}
-                          className={`w-full text-left p-4 rounded-xl border transition-all flex justify-between items-center ${expandedProjectName === name
-                            ? 'bg-purple-500/10 border-purple-500/50'
-                            : 'bg-white/5 border-white/5 hover:bg-white/10'
-                            }`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${expandedProjectName === name ? 'bg-purple-500/20 text-purple-400' : 'bg-white/5 text-gray-500'}`}>
-                              <FolderOpen className="w-5 h-5" />
-                            </div>
-                            <div>
-                              <h4 className="font-bold text-gray-200">{name}</h4>
-                              <p className="text-[10px] text-gray-500 mt-0.5">{groupItems.length} items saved</p>
-                            </div>
-                          </div>
-                          <ChevronRight className={`w-5 h-5 text-gray-600 transition-transform ${expandedProjectName === name ? 'rotate-90' : ''}`} />
-                        </button>
-
-                        {/* Group Content (Individual Saves) */}
-                        {expandedProjectName === name && (
-                          <div className="ml-6 pl-4 border-l border-white/10 space-y-1 py-1 animate-in slide-in-from-left-2 duration-200">
-                            {groupItems.sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()).map((proj: any, idx: number) => (
-                              <div key={proj.id} className="group relative">
-                                <button
-                                  onClick={() => handleLoadProject(proj.id)}
-                                  className="w-full text-left p-3 pr-24 rounded-lg bg-white/5 border border-white/5 hover:border-pink-500/50 hover:bg-pink-500/5 transition-all flex flex-col"
-                                >
-                                  <div className="text-xs font-bold text-gray-300 flex items-center gap-2">
-                                    Save #{groupItems.length - idx}
-                                    <span className="text-[10px] text-gray-500 font-mono font-normal">({proj.id.slice(0, 8)})</span>
+                    <div className="space-y-2">
+                      {savedProjects
+                        .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
+                        .map((proj: any) => (
+                          <div key={proj.id} className="bg-white/5 border border-white/5 p-4 rounded-xl flex justify-between items-center group hover:bg-white/10 transition-all">
+                            <div className="flex-1 min-w-0 pr-4">
+                              {editingProjectId === proj.id ? (
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="text"
+                                    value={editTitleValue}
+                                    onChange={(e) => setEditTitleValue(e.target.value)}
+                                    className="bg-black/40 border border-blue-500 rounded px-2 py-1 text-sm text-white focus:outline-none w-full max-w-xs"
+                                    autoFocus
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') handleUpdateProjectName(proj.id, editTitleValue);
+                                      if (e.key === 'Escape') setEditingProjectId(null);
+                                    }}
+                                  />
+                                  <button onClick={() => handleUpdateProjectName(proj.id, editTitleValue)} className="p-1 text-green-400 hover:text-green-300 bg-green-400/10 rounded"><CheckCircle className="w-4 h-4" /></button>
+                                  <button onClick={() => setEditingProjectId(null)} className="p-1 text-red-400 hover:text-red-300 bg-red-400/10 rounded"><X className="w-4 h-4" /></button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 group/title">
+                                  <div className="text-sm font-bold text-gray-200 truncate" title={proj.name}>
+                                    {proj.name || "Untitled Project"}
                                   </div>
-                                  <div className="text-[10px] text-purple-400 flex items-center gap-1 mt-1 font-bold">
-                                    <Clock className="w-3 h-3" />
-                                    {new Date(proj.updatedAt || proj.createdAt).toLocaleString()}
-                                  </div>
-                                </button>
-                                <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1">
-                                  <button
-                                    onClick={(e) => { e.stopPropagation(); handleFetchHistory(proj.id); }}
-                                    className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg transition-colors border border-white/5"
-                                    title="Internal History"
-                                  >
-                                    <RotateCcw className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={() => handleLoadProject(proj.id)}
-                                    className="p-2 bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white rounded-lg transition-colors border border-white/5"
-                                    title="Load Project"
-                                  >
-                                    <Upload className="w-3 h-3" />
-                                  </button>
                                   <button
                                     onClick={(e) => {
                                       e.stopPropagation();
-                                      handleSoftDeleteProject(proj.id);
+                                      setEditingProjectId(proj.id);
+                                      setEditTitleValue(proj.name || "Untitled Project");
                                     }}
-                                    className="p-2 bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 rounded-lg transition-colors border border-white/5"
-                                    title="Delete Project"
+                                    className="opacity-0 group-hover/title:opacity-100 text-gray-500 hover:text-white transition-opacity"
                                   >
-                                    <Trash2 className="w-3 h-3" />
+                                    <Pencil className="w-3 h-3" />
                                   </button>
                                 </div>
+                              )}
+                              <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                                <span className="flex items-center gap-1">
+                                  <Clock className="w-3 h-3" /> {new Date(proj.updatedAt || proj.createdAt).toLocaleString()}
+                                </span>
+                                <span className="font-mono text-gray-600">ID: {proj.id.slice(0, 8)}</span>
                               </div>
-                            ))}
+                            </div>
+
+                            {/* Action Buttons Area */}
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => handleFetchHistory(proj.id)}
+                                className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-all border border-purple-500/20"
+                                title="View History"
+                              >
+                                <HistoryIcon className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleLoadProject(proj.id)}
+                                className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20"
+                                title="Load Project"
+                              >
+                                <Upload className="w-4 h-4" />
+                              </button>
+                              <button
+                                onClick={() => handleSoftDeleteProject(proj.id)}
+                                className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
+                                title="Delete Project"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </div>
                           </div>
-                        )}
-                      </div>
-                    ))
-                  )
-                )}
+                        ))}
+                    </div>
+                  ))}
               </div>
 
               <div className="p-4 bg-black/40 border-t border-white/5 text-center">
@@ -3780,11 +4239,31 @@ export default function Home() {
               <div className="flex-1 overflow-y-auto p-6 flex flex-col gap-6">
 
                 <div className="flex gap-6 flex-col md:flex-row">
+                  {/* Quality Toggle Header */}
+
+
                   {/* Preview Area */}
                   <div className={clsx(
                     "flex-1 space-y-2 flex flex-col",
                     (selectedPlatform === 'custom' ? customHeight > customWidth : platformConfigs[selectedPlatform].height > platformConfigs[selectedPlatform].width) ? "items-center" : ""
                   )}>
+                    {/* Quality Toggle Header (Moved) */}
+                    <div className="w-full flex justify-center px-1 mb-1">
+                      <div className="bg-black/40 p-1 rounded-lg border border-white/10 flex text-[10px] font-bold">
+                        <button
+                          onClick={() => setPreviewQuality('low')}
+                          className={clsx("px-3 py-1.5 rounded transition-all", previewQuality === 'low' ? "bg-blue-600 text-white shadow-sm" : "text-gray-400 hover:text-gray-200")}
+                        >
+                          🚀 Performance
+                        </button>
+                        <button
+                          onClick={() => setPreviewQuality('high')}
+                          className={clsx("px-3 py-1.5 rounded transition-all", previewQuality === 'high' ? "bg-green-600 text-white shadow-sm" : "text-gray-400 hover:text-gray-200")}
+                        >
+                          ✨ Quality
+                        </button>
+                      </div>
+                    </div>
                     <div
                       className={clsx(
                         "bg-black rounded-xl overflow-hidden border border-white/10 shadow-lg relative transition-all duration-300",
@@ -3806,6 +4285,7 @@ export default function Home() {
                         outroMedia={outroMedia}
                         narrationEnabled={false}
                         narrationSpeed={1.0} // Baked via Prompt
+                        tickerSpeed={tickerSpeed}
                         subtitleSpeed={subtitleSpeed}
                         aiDisclosureEnabled={aiDisclosureEnabled}
                         watermarkUrl={watermarkUrl}
@@ -3815,8 +4295,12 @@ export default function Home() {
                         narrationFontSize={narrationFontSize}
                         showSubtitles={showSubtitles}
                         showNarrationText={showNarrationText}
-                        subtitleColor={subtitleColor}
-                        narrationColor={narrationColor}
+                        subtitleColor={debouncedSubtitleColor}
+                        narrationColor={debouncedNarrationColor}
+                        subtitleBackgroundColor={debouncedSubtitleBackgroundColor}
+                        subtitleBackgroundOpacity={debouncedSubtitleBackgroundOpacity}
+                        narrationBackgroundColor={debouncedNarrationBackgroundColor}
+                        narrationBackgroundOpacity={debouncedNarrationBackgroundOpacity}
                         subtitleFont={subtitleFont}
                         narrationFont={narrationFont}
                         subtitleEffectStyle={subtitleEffectStyle}
@@ -3835,16 +4319,47 @@ export default function Home() {
                         qrCodePosition={qrCodePosition}
                         scaleMode={imageAspectRatio === '16:9' ? 'contain' : 'cover'}
                         captionConfig={captionConfig}
+                        overlayConfig={overlayConfig}
+                        overlayMediaUrl={null} // TODO: Add UI for Overlay Media Upload
+                        quality={previewQuality} // Interactive Preview Optimization
                         previewMode={true}
-                        onComplete={() => { }}
+                        onComplete={NO_OP}
+                        onProgress={handleProgress}
+                        seekToTime={seekRequest}
+                        isScrubbing={isScrubbing}
                       />
-                      <div className="absolute top-2 right-2 bg-purple-600/80 px-2 py-1 rounded text-[10px] font-bold text-white backdrop-blur">
-                        PREVIEW MODE
+                      <div className="absolute top-2 right-2 flex gap-2">
+                        <div className="bg-purple-600/80 px-2 py-1 rounded text-[10px] font-bold text-white backdrop-blur">
+                          PREVIEW
+                        </div>
+                        <div className={clsx("px-2 py-1 rounded text-[10px] font-bold text-white backdrop-blur border border-white/10", previewQuality === 'high' ? "bg-green-600/80" : "bg-blue-600/80")}>
+                          {previewQuality === 'high' ? "HQ" : "PERF"}
+                        </div>
                       </div>
                     </div>
-                    <p className="text-xs text-gray-500 text-center">
-                      Visual preview of layout and font sizes. Audio is muted.
-                    </p>
+
+                    {/* Timeline Scrubber */}
+                    <div className="bg-[#111] border border-white/10 rounded-xl p-3 flex items-center gap-3">
+                      <div className="text-[10px] font-mono text-gray-400 w-12 text-right">
+                        {new Date(currentTime * 1000).toISOString().substr(14, 5)}
+                      </div>
+                      <input
+                        type="range"
+                        min={0}
+                        max={totalDuration || 100}
+                        step={0.1}
+                        value={currentTime}
+                        onMouseDown={handleScrubStart}
+                        onTouchStart={handleScrubStart}
+                        onMouseUp={handleScrubEnd}
+                        onTouchEnd={handleScrubEnd}
+                        onChange={handleScrubChange}
+                        className="flex-1 h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:rounded-full hover:[&::-webkit-slider-thumb]:scale-125 transition-all"
+                      />
+                      <div className="text-[10px] font-mono text-gray-500 w-12">
+                        {new Date(totalDuration * 1000).toISOString().substr(14, 5)}
+                      </div>
+                    </div>
 
 
                     {/* INFO DASHBOARD (Requested) */}
@@ -3903,6 +4418,153 @@ export default function Home() {
 
                   {/* Settings Controls */}
                   <div className="w-full md:w-80 space-y-4">
+
+
+
+                    {/* 2. Visual Effects (VFX) - NEW */}
+                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                      <button
+                        onClick={() => setExpandedSection(expandedSection === 'vfx' ? null : 'vfx')}
+                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                          <Sparkles className="w-4 h-4 text-yellow-400" /> Visual Effects (VFX)
+                        </div>
+                        <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'vfx' ? "rotate-180" : "")} />
+                      </button>
+
+                      {expandedSection === 'vfx' && (
+                        <div className="p-4 space-y-6 animate-in slide-in-from-top-2 duration-200">
+
+                          {/* Light Leaks */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                ☀️ Light Leaks
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.lightLeak.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, lightLeak: { ...p.lightLeak, enabled: e.target.checked } }))} className="accent-yellow-500" />
+                            </div>
+                            {overlayConfig.lightLeak.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-2">
+                                <div className="flex gap-2 text-[10px]">
+                                  <button onClick={() => setOverlayConfig((p: any) => ({ ...p, lightLeak: { ...p.lightLeak, colorTheme: 'warm' } }))} className={clsx("px-2 py-1 rounded border", overlayConfig.lightLeak.colorTheme === 'warm' ? "bg-orange-500/20 border-orange-500 text-orange-400" : "border-white/10 text-gray-500")}>Warm</button>
+                                  <button onClick={() => setOverlayConfig((p: any) => ({ ...p, lightLeak: { ...p.lightLeak, colorTheme: 'cool' } }))} className={clsx("px-2 py-1 rounded border", overlayConfig.lightLeak.colorTheme === 'cool' ? "bg-blue-500/20 border-blue-500 text-blue-400" : "border-white/10 text-gray-500")}>Cool</button>
+                                </div>
+                                <div className="text-[10px] text-gray-500 flex justify-between"><span>Intensity</span><span>{Math.round(overlayConfig.lightLeak.intensity * 100)}%</span></div>
+                                <input type="range" min="0" max="1" step="0.1" value={overlayConfig.lightLeak.intensity} onChange={e => setOverlayConfig((p: any) => ({ ...p, lightLeak: { ...p.lightLeak, intensity: parseFloat(e.target.value) } }))} className="w-full accent-yellow-500 h-1 bg-gray-700 rounded appearance-none" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Film Grain */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                🎞️ Film Grain
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.filmGrain.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, filmGrain: { ...p.filmGrain, enabled: e.target.checked } }))} className="accent-gray-500" />
+                            </div>
+                            {overlayConfig.filmGrain.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-2">
+                                <div className="text-[10px] text-gray-500 flex justify-between"><span>Intensity</span><span>{Math.round(overlayConfig.filmGrain.intensity * 100)}%</span></div>
+                                <input type="range" min="0" max="1" step="0.05" value={overlayConfig.filmGrain.intensity} onChange={e => setOverlayConfig((p: any) => ({ ...p, filmGrain: { ...p.filmGrain, intensity: parseFloat(e.target.value) } }))} className="w-full accent-gray-500 h-1 bg-gray-700 rounded appearance-none" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Dust Particles */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                ❄️ Dust Particles
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.dustParticles.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, dustParticles: { ...p.dustParticles, enabled: e.target.checked } }))} className="accent-white" />
+                            </div>
+                            {overlayConfig.dustParticles.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-2">
+                                <div className="text-[10px] text-gray-500 flex justify-between"><span>Density</span><span>{Math.round(overlayConfig.dustParticles.density * 100)}%</span></div>
+                                <input type="range" min="0.1" max="1" step="0.1" value={overlayConfig.dustParticles.density} onChange={e => setOverlayConfig((p: any) => ({ ...p, dustParticles: { ...p.dustParticles, density: parseFloat(e.target.value) } }))} className="w-full accent-white h-1 bg-gray-700 rounded appearance-none" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Vignette */}
+                          <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                🌑 Vignette
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.vignette.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, vignette: { ...p.vignette, enabled: e.target.checked } }))} className="accent-black" />
+                            </div>
+                            {overlayConfig.vignette.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-2">
+                                <div className="text-[10px] text-gray-500 flex justify-between"><span>Darkness</span><span>{Math.round(overlayConfig.vignette.intensity * 100)}%</span></div>
+                                <input type="range" min="0" max="1" step="0.1" value={overlayConfig.vignette.intensity} onChange={e => setOverlayConfig((p: any) => ({ ...p, vignette: { ...p.vignette, intensity: parseFloat(e.target.value) } }))} className="w-full accent-black h-1 bg-gray-700 rounded appearance-none" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Color Grading - NEW */}
+                          <div className="space-y-2 pt-4 border-t border-white/5">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                🎨 Color Grading
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.colorGrading?.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, colorGrading: { ...p.colorGrading!, enabled: e.target.checked } }))} className="accent-blue-500" />
+                            </div>
+                            {overlayConfig.colorGrading?.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-3">
+                                {/* Brightness */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Brightness</span><span>{overlayConfig.colorGrading.brightness.toFixed(1)}</span></div>
+                                  <input type="range" min="0.5" max="2.0" step="0.1" value={overlayConfig.colorGrading.brightness} onChange={e => setOverlayConfig((p: any) => ({ ...p, colorGrading: { ...p.colorGrading!, brightness: parseFloat(e.target.value) } }))} className="w-full accent-blue-500 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                                {/* Contrast */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Contrast</span><span>{overlayConfig.colorGrading.contrast.toFixed(1)}</span></div>
+                                  <input type="range" min="0.5" max="2.0" step="0.1" value={overlayConfig.colorGrading.contrast} onChange={e => setOverlayConfig((p: any) => ({ ...p, colorGrading: { ...p.colorGrading!, contrast: parseFloat(e.target.value) } }))} className="w-full accent-blue-500 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                                {/* Saturation */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Saturation</span><span>{overlayConfig.colorGrading.saturation.toFixed(1)}</span></div>
+                                  <input type="range" min="0.0" max="3.0" step="0.1" value={overlayConfig.colorGrading.saturation} onChange={e => setOverlayConfig((p: any) => ({ ...p, colorGrading: { ...p.colorGrading!, saturation: parseFloat(e.target.value) } }))} className="w-full accent-blue-500 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                                {/* Sepia */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Sepia</span><span>{overlayConfig.colorGrading.sepia?.toFixed(1)}</span></div>
+                                  <input type="range" min="0.0" max="1.0" step="0.1" value={overlayConfig.colorGrading.sepia || 0} onChange={e => setOverlayConfig((p: any) => ({ ...p, colorGrading: { ...p.colorGrading!, sepia: parseFloat(e.target.value) } }))} className="w-full accent-amber-600 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Bloom - NEW */}
+                          <div className="space-y-2 pt-2">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs font-bold text-gray-300 flex items-center gap-2">
+                                ✨ Bloom (Glow)
+                              </label>
+                              <input type="checkbox" checked={overlayConfig.bloom?.enabled} onChange={e => setOverlayConfig((p: any) => ({ ...p, bloom: { ...p.bloom!, enabled: e.target.checked } }))} className="accent-yellow-400" />
+                            </div>
+                            {overlayConfig.bloom?.enabled && (
+                              <div className="pl-2 border-l border-white/10 space-y-3">
+                                {/* Strength */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Strength</span><span>{Math.round((overlayConfig.bloom.strength || 0) * 100)}%</span></div>
+                                  <input type="range" min="0" max="1" step="0.1" value={overlayConfig.bloom.strength} onChange={e => setOverlayConfig((p: any) => ({ ...p, bloom: { ...p.bloom!, strength: parseFloat(e.target.value) } }))} className="w-full accent-yellow-400 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                                {/* Radius */}
+                                <div>
+                                  <div className="text-[10px] text-gray-500 flex justify-between"><span>Radius</span><span>{overlayConfig.bloom.radius}px</span></div>
+                                  <input type="range" min="0" max="50" step="1" value={overlayConfig.bloom.radius} onChange={e => setOverlayConfig((p: any) => ({ ...p, bloom: { ...p.bloom!, radius: parseInt(e.target.value) } }))} className="w-full accent-yellow-400 h-1 bg-gray-700 rounded appearance-none" />
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
+                        </div>
+                      )}
+                    </div>
 
                     {/* 1. Background Settings (NEW) */}
                     <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
@@ -4313,6 +4975,20 @@ export default function Home() {
                               </span>
                               <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, true)} />
                             </label>
+                            {introMedia && introMedia.type === 'image' && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-gray-400 w-20">Duration (s)</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="60"
+                                  step="0.5"
+                                  value={introMedia.duration}
+                                  onChange={(e) => setIntroMedia({ ...introMedia, duration: parseFloat(e.target.value) })}
+                                  className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
+                                />
+                              </div>
+                            )}
                           </div>
 
                           {/* Outro */}
@@ -4333,6 +5009,20 @@ export default function Home() {
                               </span>
                               <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, false)} />
                             </label>
+                            {outroMedia && outroMedia.type === 'image' && (
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className="text-xs text-gray-400 w-20">Duration (s)</span>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="60"
+                                  step="0.5"
+                                  value={outroMedia.duration}
+                                  onChange={(e) => setOutroMedia({ ...outroMedia, duration: parseFloat(e.target.value) })}
+                                  className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
+                                />
+                              </div>
+                            )}
                           </div>
                         </div>
                       )}
@@ -4467,7 +5157,7 @@ export default function Home() {
                             <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
                               <div className="flex justify-between items-center">
                                 <label className="text-xs text-gray-400">Stroke Color</label>
-                                <div className="flex items-center gap-2">
+                                <div className="relative w-6 h-6 flex items-center justify-center">
                                   <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleStrokeColor }}></div>
                                   <input
                                     type="color"
@@ -4476,7 +5166,7 @@ export default function Home() {
                                       setSubtitleStrokeColor(e.target.value);
                                       setSubtitlePreset('custom');
                                     }}
-                                    className="w-16 h-6 rounded cursor-pointer bg-transparent border-none p-0 opacity-0 absolute w-8 h-8"
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
                                   />
                                 </div>
                               </div>
@@ -4497,10 +5187,9 @@ export default function Home() {
                               </div>
                             </div>
 
-                            {/* 3. Opacity */}
                             <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
                               <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                <span>Opacity</span>
+                                <span>Text Opacity</span>
                                 <span className="text-purple-400 font-mono">{Math.round(subtitleOpacity * 100)}%</span>
                               </div>
                               <input
@@ -4510,6 +5199,32 @@ export default function Home() {
                                   setSubtitleOpacity(parseFloat(e.target.value));
                                   setSubtitlePreset('custom');
                                 }}
+                                className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                            </div>
+
+                            {/* 4. Background Settings */}
+                            <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                              <div className="flex justify-between items-center mb-2">
+                                <label className="text-xs text-gray-400">Background Color</label>
+                                <div className="relative w-6 h-6 flex items-center justify-center">
+                                  <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleBackgroundColor }}></div>
+                                  <input
+                                    type="color"
+                                    value={subtitleBackgroundColor}
+                                    onChange={(e) => setSubtitleBackgroundColor(e.target.value)}
+                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
+                                  />
+                                </div>
+                              </div>
+                              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>Background Opacity</span>
+                                <span className="text-purple-400 font-mono">{Math.round(subtitleBackgroundOpacity * 100)}%</span>
+                              </div>
+                              <input
+                                type="range" min="0" max="1" step="0.1"
+                                value={subtitleBackgroundOpacity}
+                                onChange={(e) => setSubtitleBackgroundOpacity(parseFloat(e.target.value))}
                                 className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                               />
                             </div>
@@ -4592,238 +5307,284 @@ export default function Home() {
                                 />
                               </div>
 
-                              {/* Font Family */}
+                              {/* Ticker Speed Slider */}
                               <div>
-                                <label className="text-xs text-gray-400 block mb-1">Font Family</label>
-                                <select
-                                  value={narrationFont}
-                                  onChange={(e) => setNarrationFont(e.target.value)}
-                                  className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 transition-colors"
-                                  style={{ fontFamily: narrationFont }}
-                                >
-                                  {fontOptions.map(f => (
-                                    <option key={f} value={f} style={{ fontFamily: f }}>
-                                      {fontDisplayMap[f] || f}
-                                    </option>
-                                  ))}
-                                </select>
+                                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                  <span>Ticker Speed</span>
+                                  <span className="text-blue-400 font-mono">x{tickerSpeed.toFixed(1)}</span>
+                                </div>
+                                <input
+                                  type="range" min="0.1" max="3.0" step="0.1"
+                                  value={tickerSpeed}
+                                  onChange={(e) => setTickerSpeed(parseFloat(e.target.value))}
+                                  className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                              </div>
+
+
+
+                              <select
+                                value={narrationFont}
+                                onChange={(e) => setNarrationFont(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 transition-colors"
+                                style={{ fontFamily: narrationFont }}
+                              >
+                                {fontOptions.map(f => (
+                                  <option key={f} value={f} style={{ fontFamily: f }}>
+                                    {fontDisplayMap[f] || f}
+                                  </option>
+                                ))}
+                              </select>
+
+                              {/* Background Settings */}
+                              <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                                <div className="flex justify-between items-center mb-2">
+                                  <label className="text-xs text-gray-400">Background Color</label>
+                                  <div className="relative w-6 h-6 flex items-center justify-center">
+                                    <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: narrationBackgroundColor }}></div>
+                                    <input
+                                      type="color"
+                                      value={narrationBackgroundColor}
+                                      onChange={(e) => setNarrationBackgroundColor(e.target.value)}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
+                                    />
+                                  </div>
+                                </div>
+                                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                  <span>Background Opacity</span>
+                                  <span className="text-blue-400 font-mono">{Math.round(narrationBackgroundOpacity * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min="0" max="1" step="0.1"
+                                  value={narrationBackgroundOpacity}
+                                  onChange={(e) => setNarrationBackgroundOpacity(parseFloat(e.target.value))}
+                                  className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                />
                               </div>
                             </div>
                           ) : (
-                            // DYNAMIC MODE (New Controls)
-                            <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
+                            <>
+                              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
 
-                              {/* 2. Quick Style */}
-                              <div>
-                                <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
-                                <select
-                                  value={captionConfig.dynamicStyle.preset}
-                                  onChange={(e) => {
-                                    const preset = e.target.value;
-                                    const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
-
-                                    if (selectedPreset) {
-                                      setCaptionConfig(prev => ({
-                                        ...prev,
-                                        dynamicStyle: {
-                                          ...prev.dynamicStyle,
-                                          preset,
-                                          ...selectedPreset.style
-                                        }
-                                      }));
-                                    } else {
-                                      // Custom or unknown
-                                      setCaptionConfig(prev => ({
-                                        ...prev,
-                                        dynamicStyle: { ...prev.dynamicStyle, preset }
-                                      }));
-                                    }
-                                  }}
-                                  className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
-                                >
-                                  <option value="custom">Custom</option>
-                                  {CAPTION_PRESETS.map((preset) => (
-                                    <option key={preset.id} value={preset.id}>
-                                      {preset.label}
-                                    </option>
-                                  ))}
-                                </select>
-                              </div>
-
-                              {/* 2.5 Sync / Timing (New) */}
-                              <div>
-                                <div className="flex justify-between text-xs text-gray-400 mb-2">
-                                  <label className="font-bold block flex items-center gap-1"><Clock className="w-3 h-3" /> Sync Offset (Timing)</label>
-                                  <span className={clsx("font-mono font-bold", subtitleSyncShift > 0 ? "text-yellow-400" : subtitleSyncShift < 0 ? "text-blue-400" : "text-gray-500")}>
-                                    {subtitleSyncShift > 0 ? "+" : ""}{subtitleSyncShift.toFixed(1)}s
-                                  </span>
-                                </div>
-                                <input
-                                  type="range"
-                                  min="-2.0" max="2.0" step="0.1"
-                                  value={subtitleSyncShift}
-                                  onChange={(e) => setSubtitleSyncShift(parseFloat(e.target.value))}
-                                  className="w-full accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                />
-                                <p className="text-[10px] text-gray-500 mt-1">
-                                  (+) Delay Highlight | (-) Advance Highlight
-                                </p>
-                              </div>
-
-                              {/* 3. Highlight Settings */}
-                              <div>
-                                <label className="text-xs font-bold text-gray-400 mb-2 block">Highlight Colors</label>
-                                <div className="grid grid-cols-2 gap-3">
-                                  <div className="bg-white/5 p-2 rounded border border-white/5">
-                                    <div className="text-[10px] text-gray-500 mb-1">Active Word</div>
-                                    <div className="flex items-center gap-2">
-                                      <input type="color" value={captionConfig.dynamicStyle.colors.activeFill}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, activeFill: e.target.value } } }))}
-                                        className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
-                                      <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.activeFill}</span>
-                                    </div>
-                                  </div>
-                                  <div className="bg-white/5 p-2 rounded border border-white/5">
-                                    <div className="text-[10px] text-gray-500 mb-1">Base Text</div>
-                                    <div className="flex items-center gap-2">
-                                      <input type="color" value={captionConfig.dynamicStyle.colors.baseFill}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, baseFill: e.target.value } } }))}
-                                        className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
-                                      <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.baseFill}</span>
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* 4. Typography */}
-                              <div>
-                                <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><FileText className="w-3 h-3" /> Typography</label>
-                                <div className="space-y-2">
-                                  {/* Font Size Slider */}
-                                  <div>
-                                    <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                      <span>Size</span>
-                                      <span className="text-orange-400 font-mono">{captionConfig.dynamicStyle.fontSize}px</span>
-                                    </div>
-                                    <input
-                                      type="range" min="40" max="200" step="5"
-                                      value={captionConfig.dynamicStyle.fontSize}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontSize: parseInt(e.target.value) } }))}
-                                      className="w-full accent-orange-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                  </div>
-
+                                {/* 2. Quick Style */}
+                                <div>
+                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
                                   <select
-                                    value={captionConfig.dynamicStyle.fontFamily}
-                                    onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontFamily: e.target.value } }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
-                                    style={{ fontFamily: captionConfig.dynamicStyle.fontFamily }}
-                                  >
-                                    {fontOptions.map(f => (
-                                      <option key={f} value={f} style={{ fontFamily: f }}>{fontDisplayMap[f] || f}</option>
-                                    ))}
-                                  </select>
+                                    value={captionConfig.dynamicStyle.preset}
+                                    onChange={(e) => {
+                                      const preset = e.target.value;
+                                      const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
 
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-[10px] text-gray-500 w-12">Stroke</span>
-                                    <input
-                                      type="range" min="0" max="20" step="1"
-                                      value={captionConfig.dynamicStyle.colors.strokeThickness}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, strokeThickness: parseInt(e.target.value) } } }))}
-                                      className="flex-1 accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                    />
-                                    <span className="text-[10px] text-orange-400 w-6 text-right">{captionConfig.dynamicStyle.colors.strokeThickness}px</span>
-                                  </div>
-
-                                  {/* Opacity & Intensity */}
-                                  <div className="flex items-center gap-3 pt-2 border-t border-white/5">
-                                    <div className="flex-1">
-                                      <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] text-gray-500">Opacity</label>
-                                        <span className="text-[10px] text-gray-400">{Math.round((captionConfig.dynamicStyle.opacity ?? 1) * 100)}%</span>
-                                      </div>
-                                      <input
-                                        type="range" min="0.1" max="1" step="0.1"
-                                        value={captionConfig.dynamicStyle.opacity ?? 1}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, opacity: parseFloat(e.target.value) } }))}
-                                        className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                      />
-                                    </div>
-                                    <div className="flex-1">
-                                      <div className="flex justify-between mb-1">
-                                        <label className="text-[10px] text-gray-500">Intensity</label>
-                                        <span className="text-[10px] text-gray-400">x{captionConfig.dynamicStyle.intensity ?? 1}</span>
-                                      </div>
-                                      <input
-                                        type="range" min="0" max="2" step="0.1"
-                                        value={captionConfig.dynamicStyle.intensity ?? 1}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, intensity: parseFloat(e.target.value) } }))}
-                                        className="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                      />
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-
-                              {/* 5. Animation & Layout */}
-                              <div>
-                                <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><LayoutTemplate className="w-3 h-3" /> Animation & Layout</label>
-                                <div className="grid grid-cols-2 gap-3 mb-2">
-                                  <select
-                                    value={captionConfig.dynamicStyle.animation}
-                                    onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, animation: e.target.value as any } }))}
+                                      if (selectedPreset) {
+                                        setCaptionConfig(prev => ({
+                                          ...prev,
+                                          dynamicStyle: {
+                                            ...prev.dynamicStyle,
+                                            preset,
+                                            ...selectedPreset.style
+                                          }
+                                        }));
+                                      } else {
+                                        // Custom or unknown
+                                        setCaptionConfig(prev => ({
+                                          ...prev,
+                                          dynamicStyle: { ...prev.dynamicStyle, preset }
+                                        }));
+                                      }
+                                    }}
                                     className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
                                   >
-                                    <option value="none">No Motion</option>
-                                    <option value="pop">💥 Pop Up</option>
-                                    <option value="shake">🫨 Shake</option>
-                                    <option value="elastic">🎸 Elastic</option>
-                                  </select>
-
-                                  <select
-                                    value={captionConfig.dynamicStyle.layout.wordsPerLine}
-                                    onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, wordsPerLine: parseInt(e.target.value) } } }))}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
-                                  >
-                                    <option value="1">1 Word / Line</option>
-                                    <option value="2">2 Words / Line</option>
-                                    <option value="3">3 Words / Line</option>
-                                    <option value="0">Auto</option>
-                                  </select>
-                                </div>
-
-                                {/* Vertical Position */}
-                                <div className="mb-2">
-                                  <label className="text-xs text-gray-500 mb-1 block">Vertical Position</label>
-                                  <div className="flex bg-black/40 rounded p-1 gap-1">
-                                    {['top', 'middle', 'bottom'].map((pos) => (
-                                      <button
-                                        key={pos}
-                                        onClick={() => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, verticalPosition: pos as any } } }))}
-                                        className={clsx(
-                                          "flex-1 py-1 text-[10px] uppercase font-bold rounded transition-colors",
-                                          captionConfig.dynamicStyle.layout.verticalPosition === pos
-                                            ? "bg-orange-500 text-white shadow"
-                                            : "text-gray-400 hover:bg-white/5"
-                                        )}
-                                      >
-                                        {pos}
-                                      </button>
+                                    <option value="custom">Custom</option>
+                                    {CAPTION_PRESETS.map((preset) => (
+                                      <option key={preset.id} value={preset.id}>
+                                        {preset.label}
+                                      </option>
                                     ))}
-                                  </div>
+                                  </select>
                                 </div>
 
-                                <label className="flex items-center gap-2 cursor-pointer mt-2">
+                                {/* 2.5 Sync / Timing (New) */}
+                                <div>
+                                  <div className="flex justify-between text-xs text-gray-400 mb-2">
+                                    <label className="font-bold block flex items-center gap-1"><Clock className="w-3 h-3" /> Sync Offset (Timing)</label>
+                                    <span className={clsx("font-mono font-bold", subtitleSyncShift > 0 ? "text-yellow-400" : subtitleSyncShift < 0 ? "text-blue-400" : "text-gray-500")}>
+                                      {subtitleSyncShift > 0 ? "+" : ""}{subtitleSyncShift.toFixed(1)}s
+                                    </span>
+                                  </div>
                                   <input
-                                    type="checkbox"
-                                    checked={captionConfig.dynamicStyle.layout.safeZonePadding}
-                                    onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, safeZonePadding: e.target.checked } } }))}
-                                    className="w-3 h-3 accent-green-500 rounded"
+                                    type="range"
+                                    min="-2.0" max="2.0" step="0.1"
+                                    value={subtitleSyncShift}
+                                    onChange={(e) => setSubtitleSyncShift(parseFloat(e.target.value))}
+                                    className="w-full accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                   />
-                                  <span className="text-[10px] text-gray-400">Show Safe Zone (Previews UI overlap)</span>
-                                </label>
+                                  <p className="text-[10px] text-gray-500 mt-1">
+                                    (+) Delay Highlight | (-) Advance Highlight
+                                  </p>
+                                </div>
+
+                                {/* 3. Highlight Settings */}
+                                <div>
+                                  <label className="text-xs font-bold text-gray-400 mb-2 block">Highlight Colors</label>
+
+
+                                  <div className="grid grid-cols-2 gap-3">
+                                    <div className="bg-white/5 p-2 rounded border border-white/5">
+                                      <div className="text-[10px] text-gray-500 mb-1">Active Word</div>
+                                      <div className="flex items-center gap-2">
+                                        <input type="color" value={captionConfig.dynamicStyle.colors.activeFill}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, activeFill: e.target.value } } }))}
+                                          className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
+                                        <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.activeFill}</span>
+                                      </div>
+                                    </div>
+                                    <div className="bg-white/5 p-2 rounded border border-white/5">
+                                      <div className="text-[10px] text-gray-500 mb-1">Base Text</div>
+                                      <div className="flex items-center gap-2">
+                                        <input type="color" value={captionConfig.dynamicStyle.colors.baseFill}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, baseFill: e.target.value } } }))}
+                                          className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
+                                        <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.baseFill}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 4. Typography */}
+                                <div>
+                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><FileText className="w-3 h-3" /> Typography</label>
+                                  <div className="space-y-2">
+                                    {/* Font Size Slider */}
+                                    <div>
+                                      <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                        <span>Size</span>
+                                        <span className="text-orange-400 font-mono">{captionConfig.dynamicStyle.fontSize}px</span>
+                                      </div>
+                                      <input
+                                        type="range" min="40" max="200" step="5"
+                                        value={captionConfig.dynamicStyle.fontSize}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontSize: parseInt(e.target.value) } }))}
+                                        className="w-full accent-orange-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                      />
+                                    </div>
+
+                                    <select
+                                      value={captionConfig.dynamicStyle.fontFamily}
+                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontFamily: e.target.value } }))}
+                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                                      style={{ fontFamily: captionConfig.dynamicStyle.fontFamily }}
+                                    >
+                                      {fontOptions.map(f => (
+                                        <option key={f} value={f} style={{ fontFamily: f }}>{fontDisplayMap[f] || f}</option>
+                                      ))}
+                                    </select>
+
+                                    <div className="flex items-center gap-2">
+                                      <span className="text-[10px] text-gray-500 w-12">Stroke</span>
+                                      <input
+                                        type="range" min="0" max="20" step="1"
+                                        value={captionConfig.dynamicStyle.colors.strokeThickness}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, strokeThickness: parseInt(e.target.value) } } }))}
+                                        className="flex-1 accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                      />
+                                      <span className="text-[10px] text-orange-400 w-6 text-right">{captionConfig.dynamicStyle.colors.strokeThickness}px</span>
+                                    </div>
+
+                                    {/* Opacity & Intensity */}
+                                    <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                                      <div className="flex-1">
+                                        <div className="flex justify-between mb-1">
+                                          <label className="text-[10px] text-gray-500">Opacity</label>
+                                          <span className="text-[10px] text-gray-400">{Math.round((captionConfig.dynamicStyle.opacity ?? 1) * 100)}%</span>
+                                        </div>
+                                        <input
+                                          type="range" min="0.1" max="1" step="0.1"
+                                          value={captionConfig.dynamicStyle.opacity ?? 1}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, opacity: parseFloat(e.target.value) } }))}
+                                          className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="flex justify-between mb-1">
+                                          <label className="text-[10px] text-gray-500">Intensity</label>
+                                          <span className="text-[10px] text-gray-400">x{captionConfig.dynamicStyle.intensity ?? 1}</span>
+                                        </div>
+                                        <input
+                                          type="range" min="0" max="2" step="0.1"
+                                          value={captionConfig.dynamicStyle.intensity ?? 1}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, intensity: parseFloat(e.target.value) } }))}
+                                          className="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* 5. Animation & Layout */}
+                                <div>
+                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><LayoutTemplate className="w-3 h-3" /> Animation & Layout</label>
+                                  <div className="grid grid-cols-2 gap-3 mb-2">
+                                    <select
+                                      value={captionConfig.dynamicStyle.animation}
+                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, animation: e.target.value as any } }))}
+                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
+                                    >
+                                      <option value="none">No Motion</option>
+                                      <option value="pop">💥 Pop Up</option>
+                                      <option value="shake">🫨 Shake</option>
+                                      <option value="elastic">🎸 Elastic</option>
+                                      <option value="mask_reveal">🎭 Mask Reveal</option>
+                                      <option value="typewriter">⌨️ Typewriter</option>
+                                      <option value="karaoke_v2">🎤 Karaoke (Fill)</option>
+                                      <option value="kinetic_stacking">📚 Kinetic Stacking</option>
+                                    </select>
+
+                                    <select
+                                      value={captionConfig.dynamicStyle.layout.wordsPerLine}
+                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, wordsPerLine: parseInt(e.target.value) } } }))}
+                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
+                                    >
+                                      <option value="1">1 Word / Line</option>
+                                      <option value="2">2 Words / Line</option>
+                                      <option value="3">3 Words / Line</option>
+                                      <option value="0">Auto</option>
+                                    </select>
+                                  </div>
+
+                                  {/* Vertical Position */}
+                                  <div className="mb-2">
+                                    <label className="text-xs text-gray-500 mb-1 block">Vertical Position</label>
+                                    <div className="flex bg-black/40 rounded p-1 gap-1">
+                                      {['top', 'middle', 'bottom'].map((pos) => (
+                                        <button
+                                          key={pos}
+                                          onClick={() => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, verticalPosition: pos as any } } }))}
+                                          className={clsx(
+                                            "flex-1 py-1 text-[10px] uppercase font-bold rounded transition-colors",
+                                            captionConfig.dynamicStyle.layout.verticalPosition === pos
+                                              ? "bg-orange-500 text-white shadow"
+                                              : "text-gray-400 hover:bg-white/5"
+                                          )}
+                                        >
+                                          {pos}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+
+                                  <label className="flex items-center gap-2 cursor-pointer mt-2">
+                                    <input
+                                      type="checkbox"
+                                      checked={captionConfig.dynamicStyle.layout.safeZonePadding}
+                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, safeZonePadding: e.target.checked } } }))}
+                                      className="w-3 h-3 accent-green-500 rounded"
+                                    />
+                                    <span className="text-[10px] text-gray-400">Show Safe Zone (Previews UI overlap)</span>
+                                  </label>
+                                </div>
                               </div>
-                            </div>
+
+                            </>
                           )}
 
                           {/* Global Toggle (Applies to both) */}
@@ -4886,7 +5647,7 @@ export default function Home() {
                 </button>
               </div>
             </div>
-          </div>
+          </div >
         )
       }
 
@@ -5090,21 +5851,36 @@ export default function Home() {
               </p>
 
               <div className="space-y-3 pt-2">
+                <div>
+                  <label className="text-xs text-gray-400 block mb-1">Version Memo</label>
+                  <input
+                    value={saveMemo}
+                    onChange={(e) => setSaveMemo(e.target.value)}
+                    placeholder="e.g. Changed Intro Music"
+                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none"
+                  />
+                </div>
                 <button
-                  onClick={() => handleSaveProject(true)}
+                  onClick={() => handleSaveProject(true, 'pre')}
                   disabled={isProcessing}
                   className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
                 >
                   {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Update Current Version
+                  Save
                 </button>
 
                 <button
-                  onClick={() => handleSaveProject(false)}
+                  onClick={() => {
+                    if (!saveMemo || !saveMemo.trim()) {
+                      alert("Please enter a Version Memo to save as a new version.");
+                      return;
+                    }
+                    handleSaveProject(true, 'snapshot');
+                  }}
                   disabled={isProcessing}
                   className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
                 >
-                  <Copy className="w-4 h-4" />
+                  <HistoryIcon className="w-4 h-4" />
                   Save as New Version
                 </button>
               </div>
@@ -5119,6 +5895,72 @@ export default function Home() {
           </div>
         )
       }
+      {
+        showSNSModal && (currentProjectId || selectedProject) && (
+          <SNSUploadModal
+            project={selectedProject ? {
+              id: selectedProject.id,
+              title: selectedProject.title,
+              videoPath: selectedProject.videoPath,
+              description: selectedProject.description
+            } : {
+              id: currentProjectId!,
+              title: projectTitle,
+              videoPath: "",
+            }}
+            onClose={() => setShowSNSModal(false)}
+            onUploadSuccess={async (url: string) => {
+              alert("Upload Successful: " + url);
+              setShowSNSModal(false);
+
+              // 1. Refresh global list (Grid View)
+              await fetchServerProjects();
+
+              // 2. If viewing details (Gallery), refresh that specific project to see new history
+              if (selectedProject) {
+                try {
+                  const res = await fetch(`/api/projects?id=${selectedProject.id}`);
+                  const data = await res.json();
+                  // Ensure we preserve any local view state if needed, but data has the fresh uploads
+                  setSelectedProject(data);
+                } catch (e) {
+                  console.error("Failed to refresh project details", e);
+                }
+              }
+            }}
+          />
+        )
+      }
+      {
+        showSNSManager && (
+          <SNSManagerModal onClose={() => setShowSNSManager(false)} />
+        )
+      }
+      {/* Image Crop Modal */}
+      {cropModal?.isOpen && (
+        <ImageCropModal
+          imageUrl={cropModal.imageUrl}
+          targetWidth={cropModal.targetW}
+          targetHeight={cropModal.targetH}
+          onConfirm={(croppedUrl) => {
+            setSceneItems(prev => {
+              const updated = [...prev];
+              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: croppedUrl, status: 'approved' as any };
+              return updated;
+            });
+            setCropModal(null);
+          }}
+          onUseOriginal={() => {
+            setSceneItems(prev => {
+              const updated = [...prev];
+              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: cropModal.imageUrl, status: 'approved' as any };
+              return updated;
+            });
+            setCropModal(null);
+          }}
+          onClose={() => setCropModal(null)}
+        />
+      )}
     </main >
   );
 }

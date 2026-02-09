@@ -149,7 +149,7 @@ export async function POST(request: Request) {
 
                     if (bestLink && bestTitle && elementDate >= targetDate) {
                         // Resolve relative URLs first
-                        const fullLink = bestLink.startsWith('http') ? bestLink : new URL(bestLink, url).toString();
+                        const fullLink = (bestLink as string).startsWith('http') ? (bestLink as string) : new URL(bestLink as string, url).toString();
 
                         // Check if already added (by Link OR Title)
                         if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {

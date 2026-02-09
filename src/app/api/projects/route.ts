@@ -57,7 +57,7 @@ const saveProjectImages = (projectId: string, sceneItems: any[]) => {
 export async function POST(request: Request) {
     try {
         const base = getAirtableBase();
-        const { id, name, sceneItems, settings } = await request.json();
+        const { id, name, sceneItems, settings, archiveType = 'pre' } = await request.json();
 
         // Check if ID is a valid Airtable ID (starts with 'rec')
         // If it's a UUID (from local FS), we should create a new record in Airtable instead of updating
@@ -80,16 +80,33 @@ export async function POST(request: Request) {
             // Inject lastModified timestamp
             settings.lastModified = new Date().toISOString();
 
-            // Capture current (pre-update) state as a history entry
-            const historyEntry = {
-                timestamp: new Date().toISOString(),
-                name: currentRecord.get('Name'),
-                sceneItems: JSON.parse(currentRecord.get('SceneItems') as string || '[]'),
-                settings: JSON.parse(currentRecord.get('Settings') as string || '{}')
-            };
+            if (archiveType === 'pre' || archiveType === 'snapshot') {
+                // Determine what to archive
+                let historyEntry;
 
-            history.unshift(historyEntry);
-            const limitedHistory = history.slice(0, 10); // Keep last 10 versions
+                if (archiveType === 'snapshot') {
+                    // Snapshot: Archive the *New* State (Post-update)
+                    // Use Version Memo as Name if present
+                    historyEntry = {
+                        timestamp: new Date().toISOString(),
+                        name: settings.saveMemo || name || "Snapshot",
+                        sceneItems: updatedSceneItems, // Use updated items
+                        settings: settings
+                    };
+                } else {
+                    // Pre: Archive the *Old* State (Pre-update) - Standard Safety
+                    historyEntry = {
+                        timestamp: new Date().toISOString(),
+                        name: JSON.parse(currentRecord.get('Settings') as string || '{}').saveMemo || "Auto-Save",
+                        sceneItems: JSON.parse(currentRecord.get('SceneItems') as string || '[]'),
+                        settings: JSON.parse(currentRecord.get('Settings') as string || '{}')
+                    };
+                }
+
+                history.unshift(historyEntry);
+            }
+
+            const limitedHistory = history.slice(0, 50); // Keep last 50 versions (increased)
 
             // Update existing record
             const record = await base('Projects').update(id, {
@@ -151,11 +168,18 @@ export async function GET(request: Request) {
             return NextResponse.json({
                 id: record.id,
                 name: record.get('Name'),
+                title: record.get('Name'), // Alias for UI compatibility
                 sceneItems: JSON.parse(record.get('SceneItems') as string || '[]'),
                 settings: settings,
                 history: history,
-                createdAt: (record as any).createdTime,
-                updatedAt: settings.lastModified || (record as any).createdTime
+                createdAt: (record as any)._rawJson?.createdTime || new Date().toISOString(),
+                updatedAt: settings.lastModified || (record as any)._rawJson?.createdTime || new Date().toISOString(),
+                uploads: settings.uploads || [],
+                duration: settings.totalDuration || 0,
+                saveMemo: settings.saveMemo || "",
+                videoPath: `/projects/${record.id}/video.webm`,
+                usage: settings.usage || {},
+                scenes: JSON.parse(record.get('SceneItems') as string || '[]')
             });
         } else {
             // List all projects with creation time
@@ -170,19 +194,23 @@ export async function GET(request: Request) {
                 let lastModified = null;
                 let deleted = false;
                 let saveMemo = ""; // New field
+                let uploads = []; // New field
                 try {
                     const s = JSON.parse(settingsStr || '{}');
                     lastModified = s.lastModified;
                     deleted = s.deleted || false;
                     saveMemo = s.saveMemo || ""; // Extract memo
+                    uploads = s.uploads || []; // Extract uploads
                 } catch (e) { }
 
                 return {
                     id: record.id,
                     name: record.get('Name'),
+                    title: record.get('Name'), // Alias for UI compatibility
                     createdAt: (record as any)._rawJson?.createdTime || new Date().toISOString(),
                     updatedAt: lastModified || (record as any)._rawJson?.createdTime || new Date().toISOString(),
                     saveMemo, // Return memo
+                    uploads, // Return uploads
                     deleted: deleted
                 };
             });
@@ -205,28 +233,52 @@ export async function DELETE(request: Request) {
         const base = getAirtableBase();
         const { searchParams } = new URL(request.url);
         const id = searchParams.get('id');
+        const historyTimestamp = searchParams.get('historyTimestamp');
 
         if (!id) {
             return NextResponse.json({ error: 'Project ID is required' }, { status: 400 });
         }
 
-        // Soft Delete: Fetch, Update Settings, Save
         const record = await base('Projects').find(id);
-        const settingsStr = record.get('Settings') as string || '{}';
-        let settings = {};
-        try {
-            settings = JSON.parse(settingsStr);
-        } catch (e) { }
 
-        // Mark as deleted
-        (settings as any).deleted = true;
-        (settings as any).deletedAt = new Date().toISOString();
+        if (historyTimestamp) {
+            // --- DELETE HISTORY ITEM ---
+            const currentHistoryStr = (record.get('History') as string) || '[]';
+            let history: any[] = [];
+            try {
+                history = JSON.parse(currentHistoryStr);
+            } catch (e) {
+                history = [];
+            }
 
-        await base('Projects').update(id, {
-            "Settings": JSON.stringify(settings)
-        });
+            // Filter out the item with matching timestamp
+            const newHistory = history.filter((h: any) => h.timestamp !== historyTimestamp);
 
-        return NextResponse.json({ success: true });
+            await base('Projects').update(id, {
+                "History": JSON.stringify(newHistory)
+            });
+
+            return NextResponse.json({ success: true, history: newHistory });
+
+        } else {
+            // --- SOFT DELETE PROJECT ---
+            const settingsStr = record.get('Settings') as string || '{}';
+            let settings = {};
+            try {
+                settings = JSON.parse(settingsStr);
+            } catch (e) { }
+
+            // Mark as deleted
+            (settings as any).deleted = true;
+            (settings as any).deletedAt = new Date().toISOString();
+
+            await base('Projects').update(id, {
+                "Settings": JSON.stringify(settings)
+            });
+
+            return NextResponse.json({ success: true });
+        }
+
     } catch (error: any) {
         console.error('Airtable Delete Error:', error);
         return NextResponse.json({ error: error.message }, { status: 500 });
