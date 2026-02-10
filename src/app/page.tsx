@@ -5943,7 +5943,7 @@ export default function Home() {
                   </button>
                 </div>
               </div>
-            </div >
+            </div>
             )
       }
 
@@ -6257,6 +6257,6 @@ export default function Home() {
                 onClose={() => setCropModal(null)}
               />
             )}
-          </main >
+          </main>
         );
 }
