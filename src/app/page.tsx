@@ -352,18 +352,51 @@ export default function Home() {
     try {
       // Check if template with same name exists — update it
       const existing = savedTemplates.find(t => t.name === name.trim());
-      const scenesToSave = sceneItems.map(s => {
-        // Keep server-side image URLs (e.g. /generated/..., /projects/...) — they're small strings
-        // Strip blob: URLs which are ephemeral
-        const persistentUrl = s.imageUrl && s.imageUrl.startsWith('/') ? s.imageUrl : null;
+
+      // Upload any blob/data URLs to get permanent server URLs
+      const scenesToSave = await Promise.all(sceneItems.map(async (s) => {
+        let imageUrl = s.imageUrl || null;
+
+        if (imageUrl && (imageUrl.startsWith('blob:') || imageUrl.startsWith('data:'))) {
+          // Convert blob URL to base64, then upload to server
+          try {
+            const response = await fetch(imageUrl);
+            const blob = await response.blob();
+            const reader = new FileReader();
+            const base64 = await new Promise<string>((resolve) => {
+              reader.onloadend = () => {
+                const result = reader.result as string;
+                resolve(result.split(',')[1]); // Strip data:...;base64, prefix
+              };
+              reader.readAsDataURL(blob);
+            });
+            const uploadRes = await fetch('/api/upload-image', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ base64, mimeType: blob.type }),
+            });
+            if (uploadRes.ok) {
+              const data = await uploadRes.json();
+              imageUrl = data.url; // Now a permanent /generated/... URL
+            }
+          } catch (e) {
+            console.warn('Failed to upload image for template:', e);
+            imageUrl = null; // Skip this image if upload fails
+          }
+        } else if (imageUrl && !imageUrl.startsWith('/') && !imageUrl.startsWith('./')) {
+          // Not a server URL — skip
+          imageUrl = null;
+        }
+
         return {
           ...s,
-          imageUrl: persistentUrl,
-          status: persistentUrl ? 'approved' as const : 'pending' as const,
+          imageUrl,
+          status: imageUrl ? 'approved' as const : 'pending' as const,
           audioUrl: null,
           audioDuration: undefined,
         };
-      });
+      }));
+
       const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
