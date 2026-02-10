@@ -3223,10 +3223,15 @@ export default function Home() {
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
                       if (files.length === 0) return;
-                      files.forEach((file, i) => {
-                        if (i < sceneItems.length) {
-                          handleSceneImageUpload(i, file);
-                        }
+                      setSceneItems(prev => {
+                        const updated = [...prev];
+                        files.forEach((file, i) => {
+                          if (i < updated.length) {
+                            const url = URL.createObjectURL(file);
+                            updated[i] = { ...updated[i], imageUrl: url, status: 'approved' as any };
+                          }
+                        });
+                        return updated;
                       });
                       e.target.value = '';
                     }}
