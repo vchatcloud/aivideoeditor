@@ -533,6 +533,10 @@ export default function Home() {
   } | null>(null);
   const sceneFileInputRefs = useRef<(HTMLInputElement | null)[]>([]);
 
+  // Drag & Drop reorder state
+  const [dragIdx, setDragIdx] = useState<number | null>(null);
+  const [dropIdx, setDropIdx] = useState<number | null>(null);
+
   const [subtitleFont, setSubtitleFont] = useState("Pretendard");
   const [narrationFont, setNarrationFont] = useState("Pretendard");
   // Subtitle Effects
@@ -644,6 +648,24 @@ export default function Home() {
   const handleScrubChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setCurrentTime(parseFloat(e.target.value));
   };
+
+  // Preview Sync: click scene → seek to that scene's start time
+  const handleSeekToScene = useCallback((idx: number) => {
+    // Calculate start time by summing durations of preceding enabled scenes
+    // Use the same duration formula as the renderer/Scene Breakdown display
+    let startTime = 0;
+    const enabledScenes = sceneItems.filter(s => s.isEnabled !== false);
+    for (let i = 0; i < idx && i < enabledScenes.length; i++) {
+      const s = enabledScenes[i];
+      const effectiveDuration = Math.max(
+        s.duration,
+        (s.audioDuration || 0) > 0 ? (s.audioDuration || 0) + 3.0 : 4
+      ) / (narrationSpeed || 1.0);
+      startTime += effectiveDuration;
+    }
+    setCurrentTime(startTime);
+    setSeekRequest(startTime);
+  }, [sceneItems, narrationSpeed]);
 
   const fontDisplayMap: Record<string, string> = {
     "Pretendard": "Pretendard (기본)",
@@ -1543,6 +1565,17 @@ export default function Home() {
     if (sceneItems.length <= 1) return; // Keep at least 1 scene
     if (!confirm(`Scene ${index + 1}을 삭제하시겠습니까?`)) return;
     setSceneItems(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const handleDuplicateScene = (index: number) => {
+    setSceneItems(prev => {
+      const clone = JSON.parse(JSON.stringify(prev[index]));
+      clone.status = 'pending';
+      clone.imageUrl = prev[index].imageUrl; // Keep image URL (not deep-clonable)
+      const updated = [...prev];
+      updated.splice(index + 1, 0, clone);
+      return updated;
+    });
   };
 
   const handleAddEmptyScene = () => {
@@ -3111,10 +3144,38 @@ export default function Home() {
 
               <div className="space-y-4">
                 {sceneItems.map((item, idx) => (
-                  <div key={idx} className={clsx(
-                    "bg-white/5 p-4 rounded-xl border border-white/5 hover:border-white/10 transition-colors flex gap-4",
-                    item.isEnabled === false && "opacity-50 grayscale-[0.5]"
-                  )}>
+                  <div
+                    key={idx}
+                    draggable
+                    onDragStart={(e) => {
+                      setDragIdx(idx);
+                      e.dataTransfer.effectAllowed = 'move';
+                    }}
+                    onDragOver={(e) => {
+                      e.preventDefault();
+                      e.dataTransfer.dropEffect = 'move';
+                      setDropIdx(idx);
+                    }}
+                    onDragLeave={() => setDropIdx(null)}
+                    onDrop={(e) => {
+                      e.preventDefault();
+                      if (dragIdx !== null && dragIdx !== idx) {
+                        const updated = [...sceneItems];
+                        const [moved] = updated.splice(dragIdx, 1);
+                        updated.splice(idx, 0, moved);
+                        setSceneItems(updated);
+                      }
+                      setDragIdx(null);
+                      setDropIdx(null);
+                    }}
+                    onDragEnd={() => { setDragIdx(null); setDropIdx(null); }}
+                    className={clsx(
+                      "bg-white/5 p-4 rounded-xl border transition-all flex gap-4 cursor-grab active:cursor-grabbing",
+                      item.isEnabled === false && "opacity-50 grayscale-[0.5]",
+                      dragIdx === idx && "opacity-40 scale-95 border-purple-500/50",
+                      dropIdx === idx && dragIdx !== idx && "border-purple-400 bg-purple-500/10 shadow-lg shadow-purple-900/20",
+                      dropIdx !== idx && dragIdx !== idx && "border-white/5 hover:border-white/10"
+                    )}>
                     {/* Thumbnail */}
                     <div className={clsx(
                       "w-40 h-28 bg-black rounded-lg flex items-center justify-center relative overflow-hidden shadow-lg group border transition-all",
@@ -3178,7 +3239,7 @@ export default function Home() {
                     <div className="flex-1 min-w-0 flex flex-col justify-between py-1">
                       <div>
                         <div className="flex justify-between items-start">
-                          <h4 className="font-bold text-gray-200">
+                          <h4 className="font-bold text-gray-200 cursor-pointer hover:text-purple-300 transition-colors" onClick={() => handleSeekToScene(idx)} title="Click to preview">
                             Scene {idx + 1} {item.title && <span className="ml-2 text-pink-400 text-xs font-normal">[{item.title}]</span>}
                           </h4>
                           <div className="flex items-center gap-3">
@@ -3207,6 +3268,13 @@ export default function Home() {
                                 title="Delete Scene"
                               >
                                 <Trash2 className="w-3 h-3 text-gray-400" />
+                              </button>
+                              <button
+                                onClick={() => handleDuplicateScene(idx)}
+                                className="px-1.5 py-0.5 hover:bg-blue-500/20 hover:text-blue-400 border-r border-white/5 transition-colors"
+                                title="Duplicate Scene"
+                              >
+                                <Copy className="w-3 h-3 text-gray-400" />
                               </button>
                               <button
                                 onClick={() => handleMoveScene(idx, -1)}
@@ -3264,7 +3332,23 @@ export default function Home() {
                                 <option value="glitch">Glitch (RGB Split)</option>
                               </optgroup>
                             </select>
-                            <span className="text-xs text-gray-500 font-mono">{item.duration}s</span>
+                            <input
+                              type="number"
+                              min={3}
+                              max={60}
+                              step={0.5}
+                              value={item.duration}
+                              onChange={(e) => {
+                                const val = parseFloat(e.target.value);
+                                if (!isNaN(val) && val >= 3 && val <= 60) {
+                                  const updated = [...sceneItems];
+                                  updated[idx].duration = val;
+                                  setSceneItems(updated);
+                                }
+                              }}
+                              className="w-14 bg-black/40 text-xs text-gray-300 font-mono border border-white/10 rounded px-1.5 py-0.5 outline-none focus:border-purple-500 text-center hover:border-white/20 transition-colors"
+                              title="Scene duration (seconds)"
+                            />
                           </div>
                         </div>
 
@@ -4401,7 +4485,11 @@ export default function Home() {
                         <span className="text-gray-500 text-xs block mb-2">Scene Breakdown</span>
                         <div className="max-h-32 overflow-y-auto space-y-1 custom-scrollbar pr-2">
                           {rendererScenes.map((s, i) => (
-                            <div key={i} className="flex justify-between text-xs bg-white/5 px-2 py-1.5 rounded">
+                            <div
+                              key={i}
+                              className="flex justify-between text-xs bg-white/5 px-2 py-1.5 rounded cursor-pointer hover:bg-white/10 hover:text-purple-300 transition-colors"
+                              onClick={() => handleSeekToScene(i)}
+                            >
                               <span className="text-gray-300 w-48 text-ellipsis overflow-hidden whitespace-nowrap">
                                 #{i + 1} {s.subtitle || s.text || "Untitled"}
                               </span>
