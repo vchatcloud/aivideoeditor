@@ -306,11 +306,16 @@ export default function Home() {
   // Video Configuration State
   const [totalDuration, setTotalDuration] = useState(0);
   const [isRendering, setIsRendering] = useState(false);
+  const [exportProgress, setExportProgress] = useState({ current: 0, total: 1 });
+  const exportStartTimeRef = useRef<number>(0);
 
   // Audio State
   const [audioEnabled, setAudioEnabled] = useState(false);
   const [audioFile, setAudioFile] = useState<File | null>(null);
   const [audioVolume, setAudioVolume] = useState(0.5); // Default 50%
+  const [bgmFadeIn, setBgmFadeIn] = useState(2); // seconds
+  const [bgmFadeOut, setBgmFadeOut] = useState(3); // seconds
+  const [bgmDucking, setBgmDucking] = useState(0.3); // reduce to 30% during narration
   const [isPreviewingBGM, setIsPreviewingBGM] = useState(false);
   const bgmPreviewRef = useRef<HTMLAudioElement | null>(null);
 
@@ -3119,6 +3124,31 @@ export default function Home() {
                     <span className="block text-[10px] text-gray-500 font-bold">EST. COST</span>
                     <span className="block text-xs text-purple-300 font-mono">₩{(sceneItems.filter(s => s.isEnabled !== false).length * 58).toLocaleString()}</span>
                   </div>
+                  {/* Bulk Image Upload */}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    ref={el => { (window as any).__bulkUploadRef = el; }}
+                    className="hidden"
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files || []);
+                      if (files.length === 0) return;
+                      files.forEach((file, i) => {
+                        if (i < sceneItems.length) {
+                          handleSceneImageUpload(i, file);
+                        }
+                      });
+                      e.target.value = '';
+                    }}
+                  />
+                  <button
+                    onClick={() => (window as any).__bulkUploadRef?.click()}
+                    className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-xs font-bold flex items-center gap-2 transition-all"
+                    title="Upload multiple images to scenes in order"
+                  >
+                    <Upload className="w-3 h-3" /> Bulk Upload
+                  </button>
                   <button
                     onClick={handleGenerateAllImages}
                     disabled={isProcessing}
@@ -3380,7 +3410,17 @@ export default function Home() {
                         </div>
 
                         <div className="flex items-start gap-2 mt-3 text-[10px] text-gray-500 bg-black/30 p-2 rounded border border-white/5">
-                          <span className="text-purple-400 font-bold uppercase shrink-0 mt-1">Prompt</span>
+                          <div className="flex flex-col items-center gap-1 shrink-0 mt-1">
+                            <span className="text-purple-400 font-bold uppercase">Prompt</span>
+                            <button
+                              onClick={() => handleGenerateSceneImage(idx)}
+                              disabled={item.status === 'generating'}
+                              className="p-1 rounded hover:bg-purple-500/20 text-gray-500 hover:text-purple-400 transition-colors disabled:opacity-30"
+                              title="Regenerate image with this prompt"
+                            >
+                              <RefreshCw className={clsx("w-3 h-3", item.status === 'generating' && "animate-spin")} />
+                            </button>
+                          </div>
                           <textarea
                             value={item.imagePrompt}
                             onChange={(e) => {
@@ -3641,7 +3681,40 @@ export default function Home() {
                     previewMode={false}
                     onComplete={handleRenderComplete}
                     onLog={handleRenderLog}
+                    onProgress={(current, total) => {
+                      setExportProgress({ current, total });
+                      if (current < 0.1) exportStartTimeRef.current = Date.now();
+                    }}
                   />
+                  {/* Export Progress Bar */}
+                  <div className="absolute bottom-0 left-0 right-0 bg-black/80 backdrop-blur p-4">
+                    <div className="flex items-center gap-4">
+                      <div className="flex-1">
+                        <div className="flex justify-between text-xs text-gray-400 mb-1">
+                          <span>Rendering... {Math.round((exportProgress.current / Math.max(exportProgress.total, 0.01)) * 100)}%</span>
+                          <span>
+                            {(() => {
+                              const elapsed = (Date.now() - exportStartTimeRef.current) / 1000;
+                              const pct = exportProgress.current / Math.max(exportProgress.total, 0.01);
+                              if (pct < 0.05 || elapsed < 2) return 'Calculating...';
+                              const remaining = (elapsed / pct) - elapsed;
+                              if (remaining > 60) return `~${Math.round(remaining / 60)}m ${Math.round(remaining % 60)}s remaining`;
+                              return `~${Math.round(remaining)}s remaining`;
+                            })()}
+                          </span>
+                        </div>
+                        <div className="w-full bg-gray-800 rounded-full h-2 overflow-hidden">
+                          <div
+                            className="h-full bg-gradient-to-r from-purple-500 to-pink-500 rounded-full transition-all duration-300"
+                            style={{ width: `${Math.min(100, (exportProgress.current / Math.max(exportProgress.total, 0.01)) * 100)}%` }}
+                          />
+                        </div>
+                      </div>
+                      <span className="text-xs text-gray-500 font-mono shrink-0">
+                        {new Date(exportProgress.current * 1000).toISOString().substr(14, 5)} / {new Date(exportProgress.total * 1000).toISOString().substr(14, 5)}
+                      </span>
+                    </div>
+                  </div>
                   <div className="absolute top-8 right-8">
                     <div className="flex items-center gap-2 text-white/50 bg-black/50 px-3 py-1 rounded-full text-xs backdrop-blur-md">
                       <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse" /> Recording
@@ -4798,624 +4871,415 @@ export default function Home() {
                                     className="w-full accent-pink-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                   />
                                 </div>
+
+                                {/* Fade In / Fade Out */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                                      <span>Fade In</span>
+                                      <span className="text-pink-400 font-mono">{bgmFadeIn}s</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0" max="10" step="0.5"
+                                      value={bgmFadeIn}
+                                      onChange={(e) => setBgmFadeIn(parseFloat(e.target.value))}
+                                      className="w-full accent-pink-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                  </div>
+                                  <div>
+                                    <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                                      <span>Fade Out</span>
+                                      <span className="text-pink-400 font-mono">{bgmFadeOut}s</span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="0" max="10" step="0.5"
+                                      value={bgmFadeOut}
+                                      onChange={(e) => setBgmFadeOut(parseFloat(e.target.value))}
+                                      className="w-full accent-pink-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                  </div>
+                                </div>
+
+                                {/* Ducking */}
+                                <div>
+                                  <div className="flex justify-between text-[10px] text-gray-500 mb-1">
+                                    <span>Voice Ducking</span>
+                                    <span className="text-pink-400 font-mono">{Math.round(bgmDucking * 100)}%</span>
+                                  </div>
+                                  <input
+                                    type="range"
+                                    min="0" max="1" step="0.05"
+                                    value={bgmDucking}
+                                    onChange={(e) => setBgmDucking(parseFloat(e.target.value))}
+                                    className="w-full accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                  <p className="text-[9px] text-gray-600 mt-0.5">BGM volume during narration playback</p>
+                                </div>
                               </div>
                             )}
                           </div>
                         </div>
                       )}
-                    </div>
 
-                    {/* 1.3 Narration Settings (Moved from Studio) */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'narration' ? null : 'narration')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <MessageSquare className="w-4 h-4 text-orange-400" /> Narration Settings
-                        </div>
-                        <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'narration' ? "rotate-180" : "")} />
-                      </button>
-
-                      {expandedSection === 'narration' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          {/* Volume */}
-                          <div>
-                            <div className="flex justify-between text-xs text-gray-400 mb-1">
-                              <span>Narration Volume</span>
-                              <span className="text-orange-400 font-mono">{Math.round(audioVolume * 100)}%</span>
-                            </div>
-                            <input
-                              type="range" min="0" max="1" step="0.05"
-                              value={audioVolume}
-                              onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
-                              className="w-full accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                            />
+                      {/* 1.3 Narration Settings (Moved from Studio) */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'narration' ? null : 'narration')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <MessageSquare className="w-4 h-4 text-orange-400" /> Narration Settings
                           </div>
+                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'narration' ? "rotate-180" : "")} />
+                        </button>
 
-                          {/* Speed */}
-                          <div>
-                            <div className="flex justify-between text-xs text-gray-400 mb-1">
-                              <span>Playback Speed</span>
-                              <span className="text-blue-400 font-mono">{narrationSpeed}x</span>
-                            </div>
-                            <input
-                              type="range" min="0.5" max="2.0" step="0.1"
-                              value={narrationSpeed}
-                              onChange={(e) => setNarrationSpeed(parseFloat(e.target.value))}
-                              className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                            />
-                            <p className="text-[10px] text-gray-500 mt-1">* Adjusts audio playback speed and scene duration.</p>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 1.5 QR Code Overlay (NEW) */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'qrcode' ? null : 'qrcode')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <QrCode className="w-4 h-4 text-pink-400" /> QR Code Overlay
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {showQrCode && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-1.5 py-0.5 rounded">ON</span>}
-                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'qrcode' ? "rotate-180" : "")} />
-                        </div>
-                      </button>
-
-                      {expandedSection === 'qrcode' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          <div className="flex items-center justify-between">
-                            <label className="text-xs text-gray-400">Enable QR Code</label>
-                            <input
-                              type="checkbox"
-                              checked={showQrCode}
-                              onChange={(e) => setShowQrCode(e.target.checked)}
-                              className="w-4 h-4 accent-pink-500 rounded cursor-pointer"
-                            />
-                          </div>
-
-                          {showQrCode && (
-                            <div className="space-y-2">
-                              <label className="text-xs text-gray-400 block">Link URL</label>
-                              <input
-                                type="text"
-                                value={qrUrl}
-                                onChange={(e) => setQrUrl(e.target.value)}
-                                placeholder="https://..."
-                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-pink-500 transition-colors"
-                              />
-
-                              {/* QR Size Slider */}
-                              <div className="mt-3">
-                                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                  <span>Size</span>
-                                  <span className="text-pink-400 font-mono">{qrCodeSize}px</span>
-                                </div>
-                                <input
-                                  type="range" min="50" max="300" step="10"
-                                  value={qrCodeSize}
-                                  onChange={(e) => setQrCodeSize(parseInt(e.target.value))}
-                                  className="w-full accent-pink-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                />
-                              </div>
-
-                              {/* Position Selector */}
-                              <div className="mt-3">
-                                <label className="text-xs text-gray-400 block mb-2">Position</label>
-                                <div className="grid grid-cols-2 gap-2">
-                                  {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((pos) => (
-                                    <button
-                                      key={pos}
-                                      onClick={() => setQrCodePosition(pos as any)}
-                                      className={clsx(
-                                        "px-2 py-2 rounded text-[10px] font-mono border transition-all",
-                                        qrCodePosition === pos
-                                          ? "bg-pink-500 text-white border-pink-500"
-                                          : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10"
-                                      )}
-                                    >
-                                      {pos.replace('-', ' ').toUpperCase()}
-                                    </button>
-                                  ))}
-                                </div>
-                              </div>
-
-                              <div className="flex gap-2 items-center bg-white/5 p-2 rounded border border-white/5 mt-3">
-                                <div className="bg-white p-1 rounded">
-                                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                                  {qrCodeImage && <img src={qrCodeImage} className="w-12 h-12" alt="QR Preview" />}
-                                </div>
-                                <div className="text-[10px] text-gray-500">
-                                  Generates a QR code linking to the above URL.
-                                </div>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-                    </div>
-
-
-                    {/* Safety & Branding Settings */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'branding' ? null : 'branding')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <ShieldCheck className="w-4 h-4 text-blue-400" /> Safety & Branding
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {aiDisclosureEnabled && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">AI INFO</span>}
-                          {watermarkUrl && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded mr-1">LOGO</span>}
-                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'branding' ? "rotate-180" : "")} />
-                        </div>
-                      </button>
-
-                      {expandedSection === 'branding' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          {/* AI Disclosure Toggle */}
-                          <div className="flex justify-between items-center">
+                        {expandedSection === 'narration' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            {/* Volume */}
                             <div>
-                              <label className="text-xs text-gray-300 font-bold block">AI Disclosure Badge</label>
-                              <p className="text-[10px] text-gray-500">Adds "AI Generated" warning</p>
+                              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>Narration Volume</span>
+                                <span className="text-orange-400 font-mono">{Math.round(audioVolume * 100)}%</span>
+                              </div>
+                              <input
+                                type="range" min="0" max="1" step="0.05"
+                                value={audioVolume}
+                                onChange={(e) => setAudioVolume(parseFloat(e.target.value))}
+                                className="w-full accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                              />
                             </div>
-                            <label className="relative inline-flex items-center cursor-pointer">
+
+                            {/* Speed */}
+                            <div>
+                              <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                <span>Playback Speed</span>
+                                <span className="text-blue-400 font-mono">{narrationSpeed}x</span>
+                              </div>
+                              <input
+                                type="range" min="0.5" max="2.0" step="0.1"
+                                value={narrationSpeed}
+                                onChange={(e) => setNarrationSpeed(parseFloat(e.target.value))}
+                                className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                              />
+                              <p className="text-[10px] text-gray-500 mt-1">* Adjusts audio playback speed and scene duration.</p>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 1.5 QR Code Overlay (NEW) */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'qrcode' ? null : 'qrcode')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <QrCode className="w-4 h-4 text-pink-400" /> QR Code Overlay
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {showQrCode && <span className="text-[10px] bg-pink-500/20 text-pink-400 px-1.5 py-0.5 rounded">ON</span>}
+                            <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'qrcode' ? "rotate-180" : "")} />
+                          </div>
+                        </button>
+
+                        {expandedSection === 'qrcode' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex items-center justify-between">
+                              <label className="text-xs text-gray-400">Enable QR Code</label>
                               <input
                                 type="checkbox"
-                                checked={aiDisclosureEnabled}
-                                onChange={(e) => setAiDisclosureEnabled(e.target.checked)}
-                                className="sr-only peer"
+                                checked={showQrCode}
+                                onChange={(e) => setShowQrCode(e.target.checked)}
+                                className="w-4 h-4 accent-pink-500 rounded cursor-pointer"
                               />
-                              <div className="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
-                            </label>
-                          </div>
-
-                          <div className="h-px bg-white/5" />
-
-                          {/* Watermark Upload */}
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
-                              <div>
-                                <label className="text-xs text-gray-300 font-bold block">Watermark / Logo</label>
-                                <p className="text-[10px] text-gray-500">Overlay your brand logo</p>
-                              </div>
-                              {watermarkUrl && (
-                                <button onClick={() => setWatermarkUrl(null)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
-                                  <X className="w-3 h-3" /> Remove
-                                </button>
-                              )}
                             </div>
 
-                            <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors group">
-                              {isUploadingWatermark ? <Loader2 className="w-3 h-3 animate-spin text-gray-400" /> : <Upload className="w-3 h-3 text-gray-500 group-hover:text-white" />}
-                              <span className="text-xs text-gray-400 group-hover:text-white transition-colors truncate flex-1">
-                                {watermarkUrl ? "Change Logo Image..." : "Upload Logo Image..."}
-                              </span>
-                              <input
-                                type="file"
-                                className="hidden"
-                                accept="image/*"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  setIsUploadingWatermark(true);
-                                  try {
-                                    const reader = new FileReader();
-                                    reader.onload = (event) => {
-                                      setWatermarkUrl(event.target?.result as string);
-                                      setIsUploadingWatermark(false);
-                                    };
-                                    reader.readAsDataURL(file);
-                                  } catch (err) {
-                                    console.error("Failed to load watermark", err);
-                                    setIsUploadingWatermark(false);
-                                  }
-                                }}
-                              />
-                            </label>
-
-                            {watermarkUrl && (
-                              <div className="mt-2 h-16 w-full bg-black/50 rounded border border-white/10 flex items-center justify-center p-2 relative">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={watermarkUrl} className="max-h-full max-w-full object-contain" alt="Watermark Preview" />
-                                <span className="absolute bottom-1 right-2 text-[8px] text-gray-600 font-mono">PREVIEW</span>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 2. Intro / Outro Settings */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'intro' ? null : 'intro')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <Film className="w-4 h-4 text-green-400" /> Intro / Outro
-                        </div>
-                        <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'intro' ? "rotate-180" : "")} />
-                      </button>
-
-                      {expandedSection === 'intro' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          {/* Intro */}
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs text-gray-400">Intro Media</span>
-                              {introMedia ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-green-400">{introMedia.type} ({introMedia.duration.toFixed(1)}s)</span>
-                                  <button onClick={() => setIntroMedia(null)} className="text-gray-500 hover:text-red-400"><X className="w-3 h-3" /></button>
-                                </div>
-                              ) : null}
-                            </div>
-                            <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-2 py-1.5 cursor-pointer hover:bg-white/5 transition-colors">
-                              <Upload className="w-3 h-3 text-gray-400" />
-                              <span className="text-xs text-gray-300 truncate w-full">
-                                {introMedia ? "Change Intro..." : "Upload Video/Image"}
-                              </span>
-                              <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, true)} />
-                            </label>
-                            {introMedia && introMedia.type === 'image' && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <span className="text-xs text-gray-400 w-20">Duration (s)</span>
+                            {showQrCode && (
+                              <div className="space-y-2">
+                                <label className="text-xs text-gray-400 block">Link URL</label>
                                 <input
-                                  type="number"
-                                  min="1"
-                                  max="60"
-                                  step="0.5"
-                                  value={introMedia.duration}
-                                  onChange={(e) => setIntroMedia({ ...introMedia, duration: parseFloat(e.target.value) })}
-                                  className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
+                                  type="text"
+                                  value={qrUrl}
+                                  onChange={(e) => setQrUrl(e.target.value)}
+                                  placeholder="https://..."
+                                  className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-pink-500 transition-colors"
                                 />
-                              </div>
-                            )}
-                          </div>
 
-                          {/* Outro */}
-                          <div>
-                            <div className="flex justify-between items-center mb-1">
-                              <span className="text-xs text-gray-400">Outro Media</span>
-                              {outroMedia ? (
-                                <div className="flex items-center gap-2">
-                                  <span className="text-xs text-green-400">{outroMedia.type} ({outroMedia.duration.toFixed(1)}s)</span>
-                                  <button onClick={() => setOutroMedia(null)} className="text-gray-500 hover:text-red-400"><X className="w-3 h-3" /></button>
-                                </div>
-                              ) : null}
-                            </div>
-                            <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-2 py-1.5 cursor-pointer hover:bg-white/5 transition-colors">
-                              <Upload className="w-3 h-3 text-gray-400" />
-                              <span className="text-xs text-gray-300 truncate w-full">
-                                {outroMedia ? "Change Outro..." : "Upload Video/Image"}
-                              </span>
-                              <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, false)} />
-                            </label>
-                            {outroMedia && outroMedia.type === 'image' && (
-                              <div className="flex items-center gap-2 mt-2">
-                                <span className="text-xs text-gray-400 w-20">Duration (s)</span>
-                                <input
-                                  type="number"
-                                  min="1"
-                                  max="60"
-                                  step="0.5"
-                                  value={outroMedia.duration}
-                                  onChange={(e) => setOutroMedia({ ...outroMedia, duration: parseFloat(e.target.value) })}
-                                  className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 3. Subtitle Settings */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'subtitle' ? null : 'subtitle')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <MessageSquare className="w-4 h-4 text-purple-400" /> Subtitle
-                        </div>
-                        <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'subtitle' ? "rotate-180" : "")} />
-                      </button>
-
-                      {expandedSection === 'subtitle' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          <div className="flex justify-between items-center">
-                            <label className="text-xs text-gray-400">Color</label>
-                            <input
-                              type="color"
-                              value={subtitleColor}
-                              onChange={(e) => setSubtitleColor(e.target.value)}
-                              className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0"
-                            />
-                          </div>
-
-                          {/* Size */}
-                          <div>
-                            <div className="flex justify-between text-xs text-gray-400 mb-1">
-                              <span>Size</span>
-                              <span className="text-purple-400 font-mono">{subtitleFontSize}px</span>
-                            </div>
-                            <input
-                              type="range" min="20" max="200" step="1"
-                              value={subtitleFontSize}
-                              onChange={(e) => setSubtitleFontSize(parseInt(e.target.value))}
-                              className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                            />
-                          </div>
-
-                          {/* Font Family */}
-                          <div>
-                            <label className="text-xs text-gray-400 block mb-1">Font Family</label>
-                            <select
-                              value={subtitleFont}
-                              onChange={(e) => setSubtitleFont(e.target.value)}
-                              className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-purple-500 transition-colors"
-                              style={{ fontFamily: subtitleFont }}
-                            >
-                              {fontOptions.map(f => (
-                                <option key={f} value={f} style={{ fontFamily: f }}>
-                                  {fontDisplayMap[f] || f}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-
-                          {/* Animation Selectors */}
-                          <div className="grid grid-cols-2 gap-2 mb-3">
-                            <div>
-                              <label className="text-xs text-gray-400 block mb-1">Entrance Animation</label>
-                              <select
-                                value={subtitleEntranceAnimation}
-                                onChange={(e) => setSubtitleEntranceAnimation(e.target.value as any)}
-                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                              >
-                                <option value="none">None</option>
-                                <option value="fade">Fade</option>
-                                <option value="slide-up">Slide Up</option>
-                                <option value="slide-down">Slide Down</option>
-                                <option value="slide-left">Slide Left</option>
-                                <option value="slide-right">Slide Right</option>
-                                <option value="zoom-in">Zoom In</option>
-                                <option value="zoom-out">Zoom Out</option>
-                                <option value="pop">Pop</option>
-                              </select>
-                            </div>
-                            <div>
-                              <label className="text-xs text-gray-400 block mb-1">Exit Animation</label>
-                              <select
-                                value={subtitleExitAnimation}
-                                onChange={(e) => setSubtitleExitAnimation(e.target.value as any)}
-                                className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
-                              >
-                                <option value="none">None</option>
-                                <option value="fade">Fade</option>
-                                <option value="slide-up">Slide Up</option>
-                                <option value="slide-down">Slide Down</option>
-                                <option value="slide-left">Slide Left</option>
-                                <option value="slide-right">Slide Right</option>
-                                <option value="zoom-in">Zoom In</option>
-                                <option value="zoom-out">Zoom Out</option>
-                                <option value="pop">Pop</option>
-                              </select>
-                            </div>
-                          </div>
-
-                          {/* Dynamic Style Settings */}
-                          <div className="space-y-4 pt-4 border-t border-white/5">
-                            {/* 1. Quick Style */}
-                            <div>
-                              <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
-                              <select
-                                value={subtitlePreset}
-                                onChange={(e) => {
-                                  const preset = e.target.value;
-                                  setSubtitlePreset(preset);
-                                  const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
-
-                                  if (selectedPreset) {
-                                    setSubtitleColor(selectedPreset.style.colors.baseFill);
-                                    setSubtitleStrokeColor(selectedPreset.style.colors.stroke);
-                                    setSubtitleStrokeWidth(selectedPreset.style.colors.strokeThickness);
-                                    setSubtitleOpacity(1.0);
-                                  }
-                                }}
-                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-purple-500"
-                              >
-                                <option value="custom">Custom</option>
-                                {CAPTION_PRESETS.map((preset) => (
-                                  <option key={preset.id} value={preset.id}>
-                                    {preset.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-
-                            {/* 2. Stroke Settings */}
-                            <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs text-gray-400">Stroke Color</label>
-                                <div className="relative w-6 h-6 flex items-center justify-center">
-                                  <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleStrokeColor }}></div>
+                                {/* QR Size Slider */}
+                                <div className="mt-3">
+                                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Size</span>
+                                    <span className="text-pink-400 font-mono">{qrCodeSize}px</span>
+                                  </div>
                                   <input
-                                    type="color"
-                                    value={subtitleStrokeColor}
-                                    onChange={(e) => {
-                                      setSubtitleStrokeColor(e.target.value);
-                                      setSubtitlePreset('custom');
-                                    }}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
+                                    type="range" min="50" max="300" step="10"
+                                    value={qrCodeSize}
+                                    onChange={(e) => setQrCodeSize(parseInt(e.target.value))}
+                                    className="w-full accent-pink-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                   />
                                 </div>
-                              </div>
-                              <div>
-                                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                  <span>Stroke Width</span>
-                                  <span className="text-purple-400 font-mono">{subtitleStrokeWidth}px</span>
+
+                                {/* Position Selector */}
+                                <div className="mt-3">
+                                  <label className="text-xs text-gray-400 block mb-2">Position</label>
+                                  <div className="grid grid-cols-2 gap-2">
+                                    {['top-left', 'top-right', 'bottom-left', 'bottom-right'].map((pos) => (
+                                      <button
+                                        key={pos}
+                                        onClick={() => setQrCodePosition(pos as any)}
+                                        className={clsx(
+                                          "px-2 py-2 rounded text-[10px] font-mono border transition-all",
+                                          qrCodePosition === pos
+                                            ? "bg-pink-500 text-white border-pink-500"
+                                            : "bg-white/5 text-gray-400 border-white/10 hover:bg-white/10"
+                                        )}
+                                      >
+                                        {pos.replace('-', ' ').toUpperCase()}
+                                      </button>
+                                    ))}
+                                  </div>
                                 </div>
+
+                                <div className="flex gap-2 items-center bg-white/5 p-2 rounded border border-white/5 mt-3">
+                                  <div className="bg-white p-1 rounded">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    {qrCodeImage && <img src={qrCodeImage} className="w-12 h-12" alt="QR Preview" />}
+                                  </div>
+                                  <div className="text-[10px] text-gray-500">
+                                    Generates a QR code linking to the above URL.
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+
+                      {/* Safety & Branding Settings */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'branding' ? null : 'branding')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <ShieldCheck className="w-4 h-4 text-blue-400" /> Safety & Branding
+                          </div>
+                          <div className="flex items-center gap-2">
+                            {aiDisclosureEnabled && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">AI INFO</span>}
+                            {watermarkUrl && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded mr-1">LOGO</span>}
+                            <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'branding' ? "rotate-180" : "")} />
+                          </div>
+                        </button>
+
+                        {expandedSection === 'branding' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            {/* AI Disclosure Toggle */}
+                            <div className="flex justify-between items-center">
+                              <div>
+                                <label className="text-xs text-gray-300 font-bold block">AI Disclosure Badge</label>
+                                <p className="text-[10px] text-gray-500">Adds "AI Generated" warning</p>
+                              </div>
+                              <label className="relative inline-flex items-center cursor-pointer">
                                 <input
-                                  type="range" min="0" max="20" step="1"
-                                  value={subtitleStrokeWidth}
-                                  onChange={(e) => {
-                                    setSubtitleStrokeWidth(parseInt(e.target.value));
-                                    setSubtitlePreset('custom');
-                                  }}
-                                  className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  type="checkbox"
+                                  checked={aiDisclosureEnabled}
+                                  onChange={(e) => setAiDisclosureEnabled(e.target.checked)}
+                                  className="sr-only peer"
                                 />
-                              </div>
+                                <div className="w-8 h-4 bg-gray-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                              </label>
                             </div>
 
-                            <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
-                              <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                <span>Text Opacity</span>
-                                <span className="text-purple-400 font-mono">{Math.round(subtitleOpacity * 100)}%</span>
-                              </div>
-                              <input
-                                type="range" min="0" max="1" step="0.1"
-                                value={subtitleOpacity}
-                                onChange={(e) => {
-                                  setSubtitleOpacity(parseFloat(e.target.value));
-                                  setSubtitlePreset('custom');
-                                }}
-                                className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                              />
-                            </div>
+                            <div className="h-px bg-white/5" />
 
-                            {/* 4. Background Settings */}
-                            <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                            {/* Watermark Upload */}
+                            <div>
                               <div className="flex justify-between items-center mb-2">
-                                <label className="text-xs text-gray-400">Background Color</label>
-                                <div className="relative w-6 h-6 flex items-center justify-center">
-                                  <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleBackgroundColor }}></div>
+                                <div>
+                                  <label className="text-xs text-gray-300 font-bold block">Watermark / Logo</label>
+                                  <p className="text-[10px] text-gray-500">Overlay your brand logo</p>
+                                </div>
+                                {watermarkUrl && (
+                                  <button onClick={() => setWatermarkUrl(null)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                                    <X className="w-3 h-3" /> Remove
+                                  </button>
+                                )}
+                              </div>
+
+                              <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors group">
+                                {isUploadingWatermark ? <Loader2 className="w-3 h-3 animate-spin text-gray-400" /> : <Upload className="w-3 h-3 text-gray-500 group-hover:text-white" />}
+                                <span className="text-xs text-gray-400 group-hover:text-white transition-colors truncate flex-1">
+                                  {watermarkUrl ? "Change Logo Image..." : "Upload Logo Image..."}
+                                </span>
+                                <input
+                                  type="file"
+                                  className="hidden"
+                                  accept="image/*"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    setIsUploadingWatermark(true);
+                                    try {
+                                      const reader = new FileReader();
+                                      reader.onload = (event) => {
+                                        setWatermarkUrl(event.target?.result as string);
+                                        setIsUploadingWatermark(false);
+                                      };
+                                      reader.readAsDataURL(file);
+                                    } catch (err) {
+                                      console.error("Failed to load watermark", err);
+                                      setIsUploadingWatermark(false);
+                                    }
+                                  }}
+                                />
+                              </label>
+
+                              {watermarkUrl && (
+                                <div className="mt-2 h-16 w-full bg-black/50 rounded border border-white/10 flex items-center justify-center p-2 relative">
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={watermarkUrl} className="max-h-full max-w-full object-contain" alt="Watermark Preview" />
+                                  <span className="absolute bottom-1 right-2 text-[8px] text-gray-600 font-mono">PREVIEW</span>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 2. Intro / Outro Settings */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'intro' ? null : 'intro')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <Film className="w-4 h-4 text-green-400" /> Intro / Outro
+                          </div>
+                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'intro' ? "rotate-180" : "")} />
+                        </button>
+
+                        {expandedSection === 'intro' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            {/* Intro */}
+                            <div>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-xs text-gray-400">Intro Media</span>
+                                {introMedia ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-green-400">{introMedia.type} ({introMedia.duration.toFixed(1)}s)</span>
+                                    <button onClick={() => setIntroMedia(null)} className="text-gray-500 hover:text-red-400"><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : null}
+                              </div>
+                              <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-2 py-1.5 cursor-pointer hover:bg-white/5 transition-colors">
+                                <Upload className="w-3 h-3 text-gray-400" />
+                                <span className="text-xs text-gray-300 truncate w-full">
+                                  {introMedia ? "Change Intro..." : "Upload Video/Image"}
+                                </span>
+                                <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, true)} />
+                              </label>
+                              {introMedia && introMedia.type === 'image' && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-xs text-gray-400 w-20">Duration (s)</span>
                                   <input
-                                    type="color"
-                                    value={subtitleBackgroundColor}
-                                    onChange={(e) => setSubtitleBackgroundColor(e.target.value)}
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
+                                    type="number"
+                                    min="1"
+                                    max="60"
+                                    step="0.5"
+                                    value={introMedia.duration}
+                                    onChange={(e) => setIntroMedia({ ...introMedia, duration: parseFloat(e.target.value) })}
+                                    className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
                                   />
                                 </div>
+                              )}
+                            </div>
+
+                            {/* Outro */}
+                            <div>
+                              <div className="flex justify-between items-center mb-1">
+                                <span className="text-xs text-gray-400">Outro Media</span>
+                                {outroMedia ? (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-xs text-green-400">{outroMedia.type} ({outroMedia.duration.toFixed(1)}s)</span>
+                                    <button onClick={() => setOutroMedia(null)} className="text-gray-500 hover:text-red-400"><X className="w-3 h-3" /></button>
+                                  </div>
+                                ) : null}
                               </div>
+                              <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-2 py-1.5 cursor-pointer hover:bg-white/5 transition-colors">
+                                <Upload className="w-3 h-3 text-gray-400" />
+                                <span className="text-xs text-gray-300 truncate w-full">
+                                  {outroMedia ? "Change Outro..." : "Upload Video/Image"}
+                                </span>
+                                <input type="file" className="hidden" accept="video/*,image/*" onChange={e => handleMediaUpload(e, false)} />
+                              </label>
+                              {outroMedia && outroMedia.type === 'image' && (
+                                <div className="flex items-center gap-2 mt-2">
+                                  <span className="text-xs text-gray-400 w-20">Duration (s)</span>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    max="60"
+                                    step="0.5"
+                                    value={outroMedia.duration}
+                                    onChange={(e) => setOutroMedia({ ...outroMedia, duration: parseFloat(e.target.value) })}
+                                    className="flex-1 bg-black/40 border border-white/10 rounded px-2 py-1 text-xs text-white outline-none focus:border-green-500"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* 3. Subtitle Settings */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'subtitle' ? null : 'subtitle')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <MessageSquare className="w-4 h-4 text-purple-400" /> Subtitle
+                          </div>
+                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'subtitle' ? "rotate-180" : "")} />
+                        </button>
+
+                        {expandedSection === 'subtitle' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            <div className="flex justify-between items-center">
+                              <label className="text-xs text-gray-400">Color</label>
+                              <input
+                                type="color"
+                                value={subtitleColor}
+                                onChange={(e) => setSubtitleColor(e.target.value)}
+                                className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0"
+                              />
+                            </div>
+
+                            {/* Size */}
+                            <div>
                               <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                <span>Background Opacity</span>
-                                <span className="text-purple-400 font-mono">{Math.round(subtitleBackgroundOpacity * 100)}%</span>
+                                <span>Size</span>
+                                <span className="text-purple-400 font-mono">{subtitleFontSize}px</span>
                               </div>
                               <input
-                                type="range" min="0" max="1" step="0.1"
-                                value={subtitleBackgroundOpacity}
-                                onChange={(e) => setSubtitleBackgroundOpacity(parseFloat(e.target.value))}
+                                type="range" min="20" max="200" step="1"
+                                value={subtitleFontSize}
+                                onChange={(e) => setSubtitleFontSize(parseInt(e.target.value))}
                                 className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                               />
                             </div>
-                          </div>
 
-                          {/* Toggle */}
-                          <div className="flex items-center justify-between pt-2 border-t border-white/5">
-                            <label className="text-xs font-bold text-gray-400">Show Subtitles</label>
-                            <input
-                              type="checkbox"
-                              checked={showSubtitles}
-                              onChange={(e) => setShowSubtitles(e.target.checked)}
-                              className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* 4. Narration Settings */}
-                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
-                      <button
-                        onClick={() => setExpandedSection(expandedSection === 'narration' ? null : 'narration')}
-                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
-                      >
-                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
-                          <FileText className="w-4 h-4 text-blue-400" /> Narration Text
-                        </div>
-                        <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'narration' ? "rotate-180" : "")} />
-                      </button>
-
-                      {expandedSection === 'narration' && (
-                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
-                          {/* Mode Switcher */}
-                          <div className="flex bg-black/40 p-1 rounded-lg mb-4">
-                            <button
-                              onClick={() => setCaptionConfig(prev => ({ ...prev, mode: 'standard' }))}
-                              className={clsx(
-                                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
-                                captionConfig.mode === 'standard' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-gray-300"
-                              )}
-                            >
-                              <FileText className="w-3 h-3" /> Standard
-                            </button>
-                            <button
-                              onClick={() => setCaptionConfig(prev => ({ ...prev, mode: 'dynamic' }))}
-                              className={clsx(
-                                "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
-                                captionConfig.mode === 'dynamic' ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow" : "text-gray-500 hover:text-gray-300"
-                              )}
-                            >
-                              <Sparkles className="w-3 h-3" /> Dynamic
-                            </button>
-                          </div>
-
-                          {captionConfig.mode === 'standard' ? (
-                            // STANDARD MODE (Existing Controls)
-                            <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
-                              <div className="flex justify-between items-center">
-                                <label className="text-xs text-gray-400">Color</label>
-                                <input
-                                  type="color"
-                                  value={narrationColor}
-                                  onChange={(e) => setNarrationColor(e.target.value)}
-                                  className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0"
-                                />
-                              </div>
-
-                              {/* Size */}
-                              <div>
-                                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                  <span>Size</span>
-                                  <span className="text-blue-400 font-mono">{narrationFontSize}px</span>
-                                </div>
-                                <input
-                                  type="range" min="16" max="80" step="1"
-                                  value={narrationFontSize}
-                                  onChange={(e) => setNarrationFontSize(parseInt(e.target.value))}
-                                  className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                />
-                              </div>
-
-                              {/* Ticker Speed Slider */}
-                              <div>
-                                <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                  <span>Ticker Speed</span>
-                                  <span className="text-blue-400 font-mono">x{tickerSpeed.toFixed(1)}</span>
-                                </div>
-                                <input
-                                  type="range" min="0.1" max="3.0" step="0.1"
-                                  value={tickerSpeed}
-                                  onChange={(e) => setTickerSpeed(parseFloat(e.target.value))}
-                                  className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                />
-                              </div>
-
-
-
+                            {/* Font Family */}
+                            <div>
+                              <label className="text-xs text-gray-400 block mb-1">Font Family</label>
                               <select
-                                value={narrationFont}
-                                onChange={(e) => setNarrationFont(e.target.value)}
-                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 transition-colors"
-                                style={{ fontFamily: narrationFont }}
+                                value={subtitleFont}
+                                onChange={(e) => setSubtitleFont(e.target.value)}
+                                className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-purple-500 transition-colors"
+                                style={{ fontFamily: subtitleFont }}
                               >
                                 {fontOptions.map(f => (
                                   <option key={f} value={f} style={{ fontFamily: f }}>
@@ -5423,632 +5287,886 @@ export default function Home() {
                                   </option>
                                 ))}
                               </select>
+                            </div>
 
-                              {/* Background Settings */}
+                            {/* Animation Selectors */}
+                            <div className="grid grid-cols-2 gap-2 mb-3">
+                              <div>
+                                <label className="text-xs text-gray-400 block mb-1">Entrance Animation</label>
+                                <select
+                                  value={subtitleEntranceAnimation}
+                                  onChange={(e) => setSubtitleEntranceAnimation(e.target.value as any)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="fade">Fade</option>
+                                  <option value="slide-up">Slide Up</option>
+                                  <option value="slide-down">Slide Down</option>
+                                  <option value="slide-left">Slide Left</option>
+                                  <option value="slide-right">Slide Right</option>
+                                  <option value="zoom-in">Zoom In</option>
+                                  <option value="zoom-out">Zoom Out</option>
+                                  <option value="pop">Pop</option>
+                                </select>
+                              </div>
+                              <div>
+                                <label className="text-xs text-gray-400 block mb-1">Exit Animation</label>
+                                <select
+                                  value={subtitleExitAnimation}
+                                  onChange={(e) => setSubtitleExitAnimation(e.target.value as any)}
+                                  className="w-full bg-black/50 border border-white/10 rounded-lg px-2 py-2 text-xs text-white focus:outline-none focus:border-purple-500"
+                                >
+                                  <option value="none">None</option>
+                                  <option value="fade">Fade</option>
+                                  <option value="slide-up">Slide Up</option>
+                                  <option value="slide-down">Slide Down</option>
+                                  <option value="slide-left">Slide Left</option>
+                                  <option value="slide-right">Slide Right</option>
+                                  <option value="zoom-in">Zoom In</option>
+                                  <option value="zoom-out">Zoom Out</option>
+                                  <option value="pop">Pop</option>
+                                </select>
+                              </div>
+                            </div>
+
+                            {/* Dynamic Style Settings */}
+                            <div className="space-y-4 pt-4 border-t border-white/5">
+                              {/* 1. Quick Style */}
+                              <div>
+                                <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
+                                <select
+                                  value={subtitlePreset}
+                                  onChange={(e) => {
+                                    const preset = e.target.value;
+                                    setSubtitlePreset(preset);
+                                    const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
+
+                                    if (selectedPreset) {
+                                      setSubtitleColor(selectedPreset.style.colors.baseFill);
+                                      setSubtitleStrokeColor(selectedPreset.style.colors.stroke);
+                                      setSubtitleStrokeWidth(selectedPreset.style.colors.strokeThickness);
+                                      setSubtitleOpacity(1.0);
+                                    }
+                                  }}
+                                  className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-purple-500"
+                                >
+                                  <option value="custom">Custom</option>
+                                  {CAPTION_PRESETS.map((preset) => (
+                                    <option key={preset.id} value={preset.id}>
+                                      {preset.label}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
+
+                              {/* 2. Stroke Settings */}
+                              <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                                <div className="flex justify-between items-center">
+                                  <label className="text-xs text-gray-400">Stroke Color</label>
+                                  <div className="relative w-6 h-6 flex items-center justify-center">
+                                    <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleStrokeColor }}></div>
+                                    <input
+                                      type="color"
+                                      value={subtitleStrokeColor}
+                                      onChange={(e) => {
+                                        setSubtitleStrokeColor(e.target.value);
+                                        setSubtitlePreset('custom');
+                                      }}
+                                      className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
+                                    />
+                                  </div>
+                                </div>
+                                <div>
+                                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Stroke Width</span>
+                                    <span className="text-purple-400 font-mono">{subtitleStrokeWidth}px</span>
+                                  </div>
+                                  <input
+                                    type="range" min="0" max="20" step="1"
+                                    value={subtitleStrokeWidth}
+                                    onChange={(e) => {
+                                      setSubtitleStrokeWidth(parseInt(e.target.value));
+                                      setSubtitlePreset('custom');
+                                    }}
+                                    className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  />
+                                </div>
+                              </div>
+
+                              <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                                <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                  <span>Text Opacity</span>
+                                  <span className="text-purple-400 font-mono">{Math.round(subtitleOpacity * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min="0" max="1" step="0.1"
+                                  value={subtitleOpacity}
+                                  onChange={(e) => {
+                                    setSubtitleOpacity(parseFloat(e.target.value));
+                                    setSubtitlePreset('custom');
+                                  }}
+                                  className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                />
+                              </div>
+
+                              {/* 4. Background Settings */}
                               <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
                                 <div className="flex justify-between items-center mb-2">
                                   <label className="text-xs text-gray-400">Background Color</label>
                                   <div className="relative w-6 h-6 flex items-center justify-center">
-                                    <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: narrationBackgroundColor }}></div>
+                                    <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: subtitleBackgroundColor }}></div>
                                     <input
                                       type="color"
-                                      value={narrationBackgroundColor}
-                                      onChange={(e) => setNarrationBackgroundColor(e.target.value)}
+                                      value={subtitleBackgroundColor}
+                                      onChange={(e) => setSubtitleBackgroundColor(e.target.value)}
                                       className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
                                     />
                                   </div>
                                 </div>
                                 <div className="flex justify-between text-xs text-gray-400 mb-1">
                                   <span>Background Opacity</span>
-                                  <span className="text-blue-400 font-mono">{Math.round(narrationBackgroundOpacity * 100)}%</span>
+                                  <span className="text-purple-400 font-mono">{Math.round(subtitleBackgroundOpacity * 100)}%</span>
                                 </div>
                                 <input
                                   type="range" min="0" max="1" step="0.1"
-                                  value={narrationBackgroundOpacity}
-                                  onChange={(e) => setNarrationBackgroundOpacity(parseFloat(e.target.value))}
-                                  className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  value={subtitleBackgroundOpacity}
+                                  onChange={(e) => setSubtitleBackgroundOpacity(parseFloat(e.target.value))}
+                                  className="w-full accent-purple-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                 />
                               </div>
                             </div>
-                          ) : (
-                            <>
-                              <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
 
-                                {/* 2. Quick Style */}
-                                <div>
-                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
-                                  <select
-                                    value={captionConfig.dynamicStyle.preset}
-                                    onChange={(e) => {
-                                      const preset = e.target.value;
-                                      const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
+                            {/* Toggle */}
+                            <div className="flex items-center justify-between pt-2 border-t border-white/5">
+                              <label className="text-xs font-bold text-gray-400">Show Subtitles</label>
+                              <input
+                                type="checkbox"
+                                checked={showSubtitles}
+                                onChange={(e) => setShowSubtitles(e.target.checked)}
+                                className="w-4 h-4 accent-purple-500 rounded cursor-pointer"
+                              />
+                            </div>
+                          </div>
+                        )}
+                      </div>
 
-                                      if (selectedPreset) {
-                                        setCaptionConfig(prev => ({
-                                          ...prev,
-                                          dynamicStyle: {
-                                            ...prev.dynamicStyle,
-                                            preset,
-                                            ...selectedPreset.style
-                                          }
-                                        }));
-                                      } else {
-                                        // Custom or unknown
-                                        setCaptionConfig(prev => ({
-                                          ...prev,
-                                          dynamicStyle: { ...prev.dynamicStyle, preset }
-                                        }));
-                                      }
-                                    }}
-                                    className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
-                                  >
-                                    <option value="custom">Custom</option>
-                                    {CAPTION_PRESETS.map((preset) => (
-                                      <option key={preset.id} value={preset.id}>
-                                        {preset.label}
-                                      </option>
-                                    ))}
-                                  </select>
+                      {/* 4. Narration Settings */}
+                      <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                        <button
+                          onClick={() => setExpandedSection(expandedSection === 'narration' ? null : 'narration')}
+                          className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                        >
+                          <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                            <FileText className="w-4 h-4 text-blue-400" /> Narration Text
+                          </div>
+                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'narration' ? "rotate-180" : "")} />
+                        </button>
+
+                        {expandedSection === 'narration' && (
+                          <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                            {/* Mode Switcher */}
+                            <div className="flex bg-black/40 p-1 rounded-lg mb-4">
+                              <button
+                                onClick={() => setCaptionConfig(prev => ({ ...prev, mode: 'standard' }))}
+                                className={clsx(
+                                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
+                                  captionConfig.mode === 'standard' ? "bg-white/10 text-white shadow" : "text-gray-500 hover:text-gray-300"
+                                )}
+                              >
+                                <FileText className="w-3 h-3" /> Standard
+                              </button>
+                              <button
+                                onClick={() => setCaptionConfig(prev => ({ ...prev, mode: 'dynamic' }))}
+                                className={clsx(
+                                  "flex-1 py-1.5 text-xs font-bold rounded-md transition-all flex items-center justify-center gap-2",
+                                  captionConfig.mode === 'dynamic' ? "bg-gradient-to-r from-orange-500 to-red-500 text-white shadow" : "text-gray-500 hover:text-gray-300"
+                                )}
+                              >
+                                <Sparkles className="w-3 h-3" /> Dynamic
+                              </button>
+                            </div>
+
+                            {captionConfig.mode === 'standard' ? (
+                              // STANDARD MODE (Existing Controls)
+                              <div className="space-y-4 animate-in fade-in slide-in-from-left-2 duration-300">
+                                <div className="flex justify-between items-center">
+                                  <label className="text-xs text-gray-400">Color</label>
+                                  <input
+                                    type="color"
+                                    value={narrationColor}
+                                    onChange={(e) => setNarrationColor(e.target.value)}
+                                    className="w-6 h-6 rounded cursor-pointer bg-transparent border-none p-0"
+                                  />
                                 </div>
 
-                                {/* 2.5 Sync / Timing (New) */}
+                                {/* Size */}
                                 <div>
-                                  <div className="flex justify-between text-xs text-gray-400 mb-2">
-                                    <label className="font-bold block flex items-center gap-1"><Clock className="w-3 h-3" /> Sync Offset (Timing)</label>
-                                    <span className={clsx("font-mono font-bold", subtitleSyncShift > 0 ? "text-yellow-400" : subtitleSyncShift < 0 ? "text-blue-400" : "text-gray-500")}>
-                                      {subtitleSyncShift > 0 ? "+" : ""}{subtitleSyncShift.toFixed(1)}s
-                                    </span>
+                                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Size</span>
+                                    <span className="text-blue-400 font-mono">{narrationFontSize}px</span>
                                   </div>
                                   <input
-                                    type="range"
-                                    min="-2.0" max="2.0" step="0.1"
-                                    value={subtitleSyncShift}
-                                    onChange={(e) => setSubtitleSyncShift(parseFloat(e.target.value))}
-                                    className="w-full accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    type="range" min="16" max="80" step="1"
+                                    value={narrationFontSize}
+                                    onChange={(e) => setNarrationFontSize(parseInt(e.target.value))}
+                                    className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
                                   />
-                                  <p className="text-[10px] text-gray-500 mt-1">
-                                    (+) Delay Highlight | (-) Advance Highlight
-                                  </p>
                                 </div>
 
-                                {/* 3. Highlight Settings */}
+                                {/* Ticker Speed Slider */}
                                 <div>
-                                  <label className="text-xs font-bold text-gray-400 mb-2 block">Highlight Colors</label>
-
-
-                                  <div className="grid grid-cols-2 gap-3">
-                                    <div className="bg-white/5 p-2 rounded border border-white/5">
-                                      <div className="text-[10px] text-gray-500 mb-1">Active Word</div>
-                                      <div className="flex items-center gap-2">
-                                        <input type="color" value={captionConfig.dynamicStyle.colors.activeFill}
-                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, activeFill: e.target.value } } }))}
-                                          className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
-                                        <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.activeFill}</span>
-                                      </div>
-                                    </div>
-                                    <div className="bg-white/5 p-2 rounded border border-white/5">
-                                      <div className="text-[10px] text-gray-500 mb-1">Base Text</div>
-                                      <div className="flex items-center gap-2">
-                                        <input type="color" value={captionConfig.dynamicStyle.colors.baseFill}
-                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, baseFill: e.target.value } } }))}
-                                          className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
-                                        <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.baseFill}</span>
-                                      </div>
-                                    </div>
+                                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Ticker Speed</span>
+                                    <span className="text-blue-400 font-mono">x{tickerSpeed.toFixed(1)}</span>
                                   </div>
+                                  <input
+                                    type="range" min="0.1" max="3.0" step="0.1"
+                                    value={tickerSpeed}
+                                    onChange={(e) => setTickerSpeed(parseFloat(e.target.value))}
+                                    className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  />
                                 </div>
 
-                                {/* 4. Typography */}
-                                <div>
-                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><FileText className="w-3 h-3" /> Typography</label>
-                                  <div className="space-y-2">
-                                    {/* Font Size Slider */}
-                                    <div>
-                                      <div className="flex justify-between text-xs text-gray-400 mb-1">
-                                        <span>Size</span>
-                                        <span className="text-orange-400 font-mono">{captionConfig.dynamicStyle.fontSize}px</span>
-                                      </div>
+
+
+                                <select
+                                  value={narrationFont}
+                                  onChange={(e) => setNarrationFont(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 transition-colors"
+                                  style={{ fontFamily: narrationFont }}
+                                >
+                                  {fontOptions.map(f => (
+                                    <option key={f} value={f} style={{ fontFamily: f }}>
+                                      {fontDisplayMap[f] || f}
+                                    </option>
+                                  ))}
+                                </select>
+
+                                {/* Background Settings */}
+                                <div className="space-y-2 p-3 bg-black/20 rounded-lg border border-white/5">
+                                  <div className="flex justify-between items-center mb-2">
+                                    <label className="text-xs text-gray-400">Background Color</label>
+                                    <div className="relative w-6 h-6 flex items-center justify-center">
+                                      <div className="w-4 h-4 rounded-full border border-white/20 shadow-sm" style={{ backgroundColor: narrationBackgroundColor }}></div>
                                       <input
-                                        type="range" min="40" max="200" step="5"
-                                        value={captionConfig.dynamicStyle.fontSize}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontSize: parseInt(e.target.value) } }))}
-                                        className="w-full accent-orange-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        type="color"
+                                        value={narrationBackgroundColor}
+                                        onChange={(e) => setNarrationBackgroundColor(e.target.value)}
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer p-0 border-none"
                                       />
                                     </div>
-
-                                    <select
-                                      value={captionConfig.dynamicStyle.fontFamily}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontFamily: e.target.value } }))}
-                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
-                                      style={{ fontFamily: captionConfig.dynamicStyle.fontFamily }}
-                                    >
-                                      {fontOptions.map(f => (
-                                        <option key={f} value={f} style={{ fontFamily: f }}>{fontDisplayMap[f] || f}</option>
-                                      ))}
-                                    </select>
-
-                                    <div className="flex items-center gap-2">
-                                      <span className="text-[10px] text-gray-500 w-12">Stroke</span>
-                                      <input
-                                        type="range" min="0" max="20" step="1"
-                                        value={captionConfig.dynamicStyle.colors.strokeThickness}
-                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, strokeThickness: parseInt(e.target.value) } } }))}
-                                        className="flex-1 accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                      />
-                                      <span className="text-[10px] text-orange-400 w-6 text-right">{captionConfig.dynamicStyle.colors.strokeThickness}px</span>
-                                    </div>
-
-                                    {/* Opacity & Intensity */}
-                                    <div className="flex items-center gap-3 pt-2 border-t border-white/5">
-                                      <div className="flex-1">
-                                        <div className="flex justify-between mb-1">
-                                          <label className="text-[10px] text-gray-500">Opacity</label>
-                                          <span className="text-[10px] text-gray-400">{Math.round((captionConfig.dynamicStyle.opacity ?? 1) * 100)}%</span>
-                                        </div>
-                                        <input
-                                          type="range" min="0.1" max="1" step="0.1"
-                                          value={captionConfig.dynamicStyle.opacity ?? 1}
-                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, opacity: parseFloat(e.target.value) } }))}
-                                          className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                        />
-                                      </div>
-                                      <div className="flex-1">
-                                        <div className="flex justify-between mb-1">
-                                          <label className="text-[10px] text-gray-500">Intensity</label>
-                                          <span className="text-[10px] text-gray-400">x{captionConfig.dynamicStyle.intensity ?? 1}</span>
-                                        </div>
-                                        <input
-                                          type="range" min="0" max="2" step="0.1"
-                                          value={captionConfig.dynamicStyle.intensity ?? 1}
-                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, intensity: parseFloat(e.target.value) } }))}
-                                          className="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
-                                        />
-                                      </div>
-                                    </div>
                                   </div>
-                                </div>
-
-                                {/* 5. Animation & Layout */}
-                                <div>
-                                  <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><LayoutTemplate className="w-3 h-3" /> Animation & Layout</label>
-                                  <div className="grid grid-cols-2 gap-3 mb-2">
-                                    <select
-                                      value={captionConfig.dynamicStyle.animation}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, animation: e.target.value as any } }))}
-                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
-                                    >
-                                      <option value="none">No Motion</option>
-                                      <option value="pop">💥 Pop Up</option>
-                                      <option value="shake">🫨 Shake</option>
-                                      <option value="elastic">🎸 Elastic</option>
-                                      <option value="mask_reveal">🎭 Mask Reveal</option>
-                                      <option value="typewriter">⌨️ Typewriter</option>
-                                      <option value="karaoke_v2">🎤 Karaoke (Fill)</option>
-                                      <option value="kinetic_stacking">📚 Kinetic Stacking</option>
-                                    </select>
-
-                                    <select
-                                      value={captionConfig.dynamicStyle.layout.wordsPerLine}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, wordsPerLine: parseInt(e.target.value) } } }))}
-                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
-                                    >
-                                      <option value="1">1 Word / Line</option>
-                                      <option value="2">2 Words / Line</option>
-                                      <option value="3">3 Words / Line</option>
-                                      <option value="0">Auto</option>
-                                    </select>
+                                  <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                    <span>Background Opacity</span>
+                                    <span className="text-blue-400 font-mono">{Math.round(narrationBackgroundOpacity * 100)}%</span>
                                   </div>
-
-                                  {/* Vertical Position */}
-                                  <div className="mb-2">
-                                    <label className="text-xs text-gray-500 mb-1 block">Vertical Position</label>
-                                    <div className="flex bg-black/40 rounded p-1 gap-1">
-                                      {['top', 'middle', 'bottom'].map((pos) => (
-                                        <button
-                                          key={pos}
-                                          onClick={() => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, verticalPosition: pos as any } } }))}
-                                          className={clsx(
-                                            "flex-1 py-1 text-[10px] uppercase font-bold rounded transition-colors",
-                                            captionConfig.dynamicStyle.layout.verticalPosition === pos
-                                              ? "bg-orange-500 text-white shadow"
-                                              : "text-gray-400 hover:bg-white/5"
-                                          )}
-                                        >
-                                          {pos}
-                                        </button>
-                                      ))}
-                                    </div>
-                                  </div>
-
-                                  <label className="flex items-center gap-2 cursor-pointer mt-2">
-                                    <input
-                                      type="checkbox"
-                                      checked={captionConfig.dynamicStyle.layout.safeZonePadding}
-                                      onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, safeZonePadding: e.target.checked } } }))}
-                                      className="w-3 h-3 accent-green-500 rounded"
-                                    />
-                                    <span className="text-[10px] text-gray-400">Show Safe Zone (Previews UI overlap)</span>
-                                  </label>
+                                  <input
+                                    type="range" min="0" max="1" step="0.1"
+                                    value={narrationBackgroundOpacity}
+                                    onChange={(e) => setNarrationBackgroundOpacity(parseFloat(e.target.value))}
+                                    className="w-full accent-blue-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                  />
                                 </div>
                               </div>
+                            ) : (
+                              <>
+                                <div className="space-y-5 animate-in fade-in slide-in-from-right-2 duration-300">
 
-                            </>
-                          )}
+                                  {/* 2. Quick Style */}
+                                  <div>
+                                    <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><Palette className="w-3 h-3" /> Quick Style</label>
+                                    <select
+                                      value={captionConfig.dynamicStyle.preset}
+                                      onChange={(e) => {
+                                        const preset = e.target.value;
+                                        const selectedPreset = CAPTION_PRESETS.find(p => p.id === preset);
 
-                          {/* Global Toggle (Applies to both) */}
-                          <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-2">
-                            <label className="text-xs font-bold text-gray-400">Show Narration Text</label>
-                            <input
-                              type="checkbox"
-                              checked={showNarrationText}
-                              onChange={(e) => {
-                                setShowNarrationText(e.target.checked);
-                                setCaptionConfig(prev => ({ ...prev, enabled: e.target.checked }));
-                              }}
-                              className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
-                            />
+                                        if (selectedPreset) {
+                                          setCaptionConfig(prev => ({
+                                            ...prev,
+                                            dynamicStyle: {
+                                              ...prev.dynamicStyle,
+                                              preset,
+                                              ...selectedPreset.style
+                                            }
+                                          }));
+                                        } else {
+                                          // Custom or unknown
+                                          setCaptionConfig(prev => ({
+                                            ...prev,
+                                            dynamicStyle: { ...prev.dynamicStyle, preset }
+                                          }));
+                                        }
+                                      }}
+                                      className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
+                                    >
+                                      <option value="custom">Custom</option>
+                                      {CAPTION_PRESETS.map((preset) => (
+                                        <option key={preset.id} value={preset.id}>
+                                          {preset.label}
+                                        </option>
+                                      ))}
+                                    </select>
+                                  </div>
+
+                                  {/* 2.5 Sync / Timing (New) */}
+                                  <div>
+                                    <div className="flex justify-between text-xs text-gray-400 mb-2">
+                                      <label className="font-bold block flex items-center gap-1"><Clock className="w-3 h-3" /> Sync Offset (Timing)</label>
+                                      <span className={clsx("font-mono font-bold", subtitleSyncShift > 0 ? "text-yellow-400" : subtitleSyncShift < 0 ? "text-blue-400" : "text-gray-500")}>
+                                        {subtitleSyncShift > 0 ? "+" : ""}{subtitleSyncShift.toFixed(1)}s
+                                      </span>
+                                    </div>
+                                    <input
+                                      type="range"
+                                      min="-2.0" max="2.0" step="0.1"
+                                      value={subtitleSyncShift}
+                                      onChange={(e) => setSubtitleSyncShift(parseFloat(e.target.value))}
+                                      className="w-full accent-green-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                    />
+                                    <p className="text-[10px] text-gray-500 mt-1">
+                                      (+) Delay Highlight | (-) Advance Highlight
+                                    </p>
+                                  </div>
+
+                                  {/* 3. Highlight Settings */}
+                                  <div>
+                                    <label className="text-xs font-bold text-gray-400 mb-2 block">Highlight Colors</label>
+
+
+                                    <div className="grid grid-cols-2 gap-3">
+                                      <div className="bg-white/5 p-2 rounded border border-white/5">
+                                        <div className="text-[10px] text-gray-500 mb-1">Active Word</div>
+                                        <div className="flex items-center gap-2">
+                                          <input type="color" value={captionConfig.dynamicStyle.colors.activeFill}
+                                            onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, activeFill: e.target.value } } }))}
+                                            className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
+                                          <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.activeFill}</span>
+                                        </div>
+                                      </div>
+                                      <div className="bg-white/5 p-2 rounded border border-white/5">
+                                        <div className="text-[10px] text-gray-500 mb-1">Base Text</div>
+                                        <div className="flex items-center gap-2">
+                                          <input type="color" value={captionConfig.dynamicStyle.colors.baseFill}
+                                            onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, baseFill: e.target.value } } }))}
+                                            className="w-6 h-6 rounded bg-transparent border-none p-0 cursor-pointer" />
+                                          <span className="text-xs font-mono text-gray-300">{captionConfig.dynamicStyle.colors.baseFill}</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* 4. Typography */}
+                                  <div>
+                                    <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><FileText className="w-3 h-3" /> Typography</label>
+                                    <div className="space-y-2">
+                                      {/* Font Size Slider */}
+                                      <div>
+                                        <div className="flex justify-between text-xs text-gray-400 mb-1">
+                                          <span>Size</span>
+                                          <span className="text-orange-400 font-mono">{captionConfig.dynamicStyle.fontSize}px</span>
+                                        </div>
+                                        <input
+                                          type="range" min="40" max="200" step="5"
+                                          value={captionConfig.dynamicStyle.fontSize}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontSize: parseInt(e.target.value) } }))}
+                                          className="w-full accent-orange-500 h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                      </div>
+
+                                      <select
+                                        value={captionConfig.dynamicStyle.fontFamily}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, fontFamily: e.target.value } }))}
+                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
+                                        style={{ fontFamily: captionConfig.dynamicStyle.fontFamily }}
+                                      >
+                                        {fontOptions.map(f => (
+                                          <option key={f} value={f} style={{ fontFamily: f }}>{fontDisplayMap[f] || f}</option>
+                                        ))}
+                                      </select>
+
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[10px] text-gray-500 w-12">Stroke</span>
+                                        <input
+                                          type="range" min="0" max="20" step="1"
+                                          value={captionConfig.dynamicStyle.colors.strokeThickness}
+                                          onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, colors: { ...prev.dynamicStyle.colors, strokeThickness: parseInt(e.target.value) } } }))}
+                                          className="flex-1 accent-orange-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                        />
+                                        <span className="text-[10px] text-orange-400 w-6 text-right">{captionConfig.dynamicStyle.colors.strokeThickness}px</span>
+                                      </div>
+
+                                      {/* Opacity & Intensity */}
+                                      <div className="flex items-center gap-3 pt-2 border-t border-white/5">
+                                        <div className="flex-1">
+                                          <div className="flex justify-between mb-1">
+                                            <label className="text-[10px] text-gray-500">Opacity</label>
+                                            <span className="text-[10px] text-gray-400">{Math.round((captionConfig.dynamicStyle.opacity ?? 1) * 100)}%</span>
+                                          </div>
+                                          <input
+                                            type="range" min="0.1" max="1" step="0.1"
+                                            value={captionConfig.dynamicStyle.opacity ?? 1}
+                                            onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, opacity: parseFloat(e.target.value) } }))}
+                                            className="w-full accent-blue-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                          />
+                                        </div>
+                                        <div className="flex-1">
+                                          <div className="flex justify-between mb-1">
+                                            <label className="text-[10px] text-gray-500">Intensity</label>
+                                            <span className="text-[10px] text-gray-400">x{captionConfig.dynamicStyle.intensity ?? 1}</span>
+                                          </div>
+                                          <input
+                                            type="range" min="0" max="2" step="0.1"
+                                            value={captionConfig.dynamicStyle.intensity ?? 1}
+                                            onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, intensity: parseFloat(e.target.value) } }))}
+                                            className="w-full accent-red-500 h-1.5 bg-gray-700 rounded-lg appearance-none cursor-pointer"
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* 5. Animation & Layout */}
+                                  <div>
+                                    <label className="text-xs font-bold text-gray-400 mb-2 block flex items-center gap-1"><LayoutTemplate className="w-3 h-3" /> Animation & Layout</label>
+                                    <div className="grid grid-cols-2 gap-3 mb-2">
+                                      <select
+                                        value={captionConfig.dynamicStyle.animation}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, animation: e.target.value as any } }))}
+                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
+                                      >
+                                        <option value="none">No Motion</option>
+                                        <option value="pop">💥 Pop Up</option>
+                                        <option value="shake">🫨 Shake</option>
+                                        <option value="elastic">🎸 Elastic</option>
+                                        <option value="mask_reveal">🎭 Mask Reveal</option>
+                                        <option value="typewriter">⌨️ Typewriter</option>
+                                        <option value="karaoke_v2">🎤 Karaoke (Fill)</option>
+                                        <option value="kinetic_stacking">📚 Kinetic Stacking</option>
+                                      </select>
+
+                                      <select
+                                        value={captionConfig.dynamicStyle.layout.wordsPerLine}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, wordsPerLine: parseInt(e.target.value) } } }))}
+                                        className="w-full bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-white outline-none focus:border-orange-500"
+                                      >
+                                        <option value="1">1 Word / Line</option>
+                                        <option value="2">2 Words / Line</option>
+                                        <option value="3">3 Words / Line</option>
+                                        <option value="0">Auto</option>
+                                      </select>
+                                    </div>
+
+                                    {/* Vertical Position */}
+                                    <div className="mb-2">
+                                      <label className="text-xs text-gray-500 mb-1 block">Vertical Position</label>
+                                      <div className="flex bg-black/40 rounded p-1 gap-1">
+                                        {['top', 'middle', 'bottom'].map((pos) => (
+                                          <button
+                                            key={pos}
+                                            onClick={() => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, verticalPosition: pos as any } } }))}
+                                            className={clsx(
+                                              "flex-1 py-1 text-[10px] uppercase font-bold rounded transition-colors",
+                                              captionConfig.dynamicStyle.layout.verticalPosition === pos
+                                                ? "bg-orange-500 text-white shadow"
+                                                : "text-gray-400 hover:bg-white/5"
+                                            )}
+                                          >
+                                            {pos}
+                                          </button>
+                                        ))}
+                                      </div>
+                                    </div>
+
+                                    <label className="flex items-center gap-2 cursor-pointer mt-2">
+                                      <input
+                                        type="checkbox"
+                                        checked={captionConfig.dynamicStyle.layout.safeZonePadding}
+                                        onChange={(e) => setCaptionConfig(prev => ({ ...prev, dynamicStyle: { ...prev.dynamicStyle, layout: { ...prev.dynamicStyle.layout, safeZonePadding: e.target.checked } } }))}
+                                        className="w-3 h-3 accent-green-500 rounded"
+                                      />
+                                      <span className="text-[10px] text-gray-400">Show Safe Zone (Previews UI overlap)</span>
+                                    </label>
+                                  </div>
+                                </div>
+
+                              </>
+                            )}
+
+                            {/* Global Toggle (Applies to both) */}
+                            <div className="flex items-center justify-between pt-2 border-t border-white/5 mt-2">
+                              <label className="text-xs font-bold text-gray-400">Show Narration Text</label>
+                              <input
+                                type="checkbox"
+                                checked={showNarrationText}
+                                onChange={(e) => {
+                                  setShowNarrationText(e.target.checked);
+                                  setCaptionConfig(prev => ({ ...prev, enabled: e.target.checked }));
+                                }}
+                                className="w-4 h-4 accent-blue-500 rounded cursor-pointer"
+                              />
+                            </div>
                           </div>
-                        </div>
-                      )}
-                    </div>
+                        )}
+                      </div>
 
-                    <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
-                      <h4 className="flex items-center gap-2 text-sm font-bold text-blue-300 mb-2">
-                        <Info className="w-4 h-4" /> Layout Tip
-                      </h4>
-                      <p className="text-xs text-blue-200/70 leading-relaxed">
-                        Split layout (Subtitle Top, Narration Bottom) activates ONLY when:
-                        <br />• <strong>Canvas</strong> is Vertical (9:16)
-                        <br />• <strong>Image</strong> is Horizontal (16:9)
-                        <br /><br />
-                        Otherwise, text appears as a ticker at the bottom.
-                      </p>
+                      <div className="bg-blue-500/10 p-4 rounded-xl border border-blue-500/20">
+                        <h4 className="flex items-center gap-2 text-sm font-bold text-blue-300 mb-2">
+                          <Info className="w-4 h-4" /> Layout Tip
+                        </h4>
+                        <p className="text-xs text-blue-200/70 leading-relaxed">
+                          Split layout (Subtitle Top, Narration Bottom) activates ONLY when:
+                          <br />• <strong>Canvas</strong> is Vertical (9:16)
+                          <br />• <strong>Image</strong> is Horizontal (16:9)
+                          <br /><br />
+                          Otherwise, text appears as a ticker at the bottom.
+                        </p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
-              <div className="p-6 border-t border-white/10 flex justify-end gap-4 bg-white/5">
-                <button
-                  onClick={() => setShowRenderSettings(false)}
-                  className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    if (currentProjectId) {
-                      try {
-                        // Auto-save settings before rendering using Update Mode
-                        await handleSaveProject(true);
-                      } catch (e) {
-                        console.error("Auto-save failed before render", e);
+                <div className="p-6 border-t border-white/10 flex justify-end gap-4 bg-white/5">
+                  <button
+                    onClick={() => setShowRenderSettings(false)}
+                    className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (currentProjectId) {
+                        try {
+                          // Auto-save settings before rendering using Update Mode
+                          await handleSaveProject(true);
+                        } catch (e) {
+                          console.error("Auto-save failed before render", e);
+                        }
                       }
-                    }
-                    setRenderLogs([]);
-                    handleConfirmRender();
-                  }}
-                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
-                >
-                  <VideoIcon className="w-5 h-5" />
-                  Start Rendering
-                </button>
+                      setRenderLogs([]);
+                      handleConfirmRender();
+                    }}
+                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
+                  >
+                    <VideoIcon className="w-5 h-5" />
+                    Start Rendering
+                  </button>
+                </div>
               </div>
-            </div>
-          </div >
-        )
+            </div >
+            )
       }
 
-      {/* Site Manager Modal */}
-      {
-        isSiteModalOpen && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] w-full max-w-md rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[80vh]">
+            {/* Site Manager Modal */}
+            {
+              isSiteModalOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+                  <div className="bg-[#1a1a1a] w-full max-w-md rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[80vh]">
 
-              {/* Header */}
-              <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                <h3 className="font-bold text-lg text-white">Saved Sites</h3>
-                <button onClick={() => setIsSiteModalOpen(false)} className="p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-
-              {/* Content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
-
-                {/* Add New Site Toggle */}
-                {!isAddingSite ? (
-                  <button
-                    onClick={() => setIsAddingSite(true)}
-                    className="w-full py-3 border border-dashed border-white/20 rounded-xl text-gray-400 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm flex items-center justify-center gap-2"
-                  >
-                    <Plus className="w-4 h-4" /> Register New Site
-                  </button>
-                ) : (
-                  <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3 animate-in fade-in slide-in-from-top-2">
-                    <input
-                      value={newSiteName}
-                      onChange={e => setNewSiteName(e.target.value)}
-                      placeholder="Site Name (e.g. Seocho)"
-                      className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
-                      autoFocus
-                    />
-                    <input
-                      value={newSiteUrl}
-                      onChange={e => setNewSiteUrl(e.target.value)}
-                      placeholder="Target URL"
-                      className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
-                    />
-                    <div className="flex justify-end gap-2">
-                      <button
-                        onClick={() => setIsAddingSite(false)}
-                        className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                      >
-                        Cancel
-                      </button>
-                      <button
-                        onClick={handleAddSite}
-                        className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
-                      >
-                        Save Site
+                    {/* Header */}
+                    <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                      <h3 className="font-bold text-lg text-white">Saved Sites</h3>
+                      <button onClick={() => setIsSiteModalOpen(false)} className="p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
+                        <X className="w-5 h-5" />
                       </button>
                     </div>
-                  </div>
-                )}
 
-                {/* Site List */}
-                <div className="space-y-2">
-                  {sites.length === 0 && !isAddingSite && (
-                    <div className="text-center py-8 text-gray-500 text-sm">
-                      No saved sites yet.
-                    </div>
-                  )}
+                    {/* Content */}
+                    <div className="flex-1 overflow-y-auto p-4 space-y-4">
 
-                  {sites.map((site, idx) => (
-                    <div key={site.id || idx} className={clsx(
-                      "group relative border p-3 rounded-xl transition-all",
-                      editingSiteId === site.id ? "bg-white/10 border-purple-500/50" : "bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10 cursor-pointer"
-                    )}
-                      onClick={() => {
-                        if (editingSiteId === site.id) return;
-                        setUrl(site.url);
-                        setIsSiteModalOpen(false);
-                      }}
-                    >
-                      {editingSiteId === site.id ? (
-                        <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                      {/* Add New Site Toggle */}
+                      {!isAddingSite ? (
+                        <button
+                          onClick={() => setIsAddingSite(true)}
+                          className="w-full py-3 border border-dashed border-white/20 rounded-xl text-gray-400 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm flex items-center justify-center gap-2"
+                        >
+                          <Plus className="w-4 h-4" /> Register New Site
+                        </button>
+                      ) : (
+                        <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3 animate-in fade-in slide-in-from-top-2">
                           <input
-                            value={editSiteName}
-                            onChange={e => setEditSiteName(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-sm text-white focus:border-purple-500 outline-none"
-                            placeholder="Site Name"
+                            value={newSiteName}
+                            onChange={e => setNewSiteName(e.target.value)}
+                            placeholder="Site Name (e.g. Seocho)"
+                            className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
                             autoFocus
                           />
                           <input
-                            value={editSiteUrl}
-                            onChange={e => setEditSiteUrl(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-xs text-gray-300 focus:border-purple-500 outline-none"
-                            placeholder="URL"
+                            value={newSiteUrl}
+                            onChange={e => setNewSiteUrl(e.target.value)}
+                            placeholder="Target URL"
+                            className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
                           />
-                          <div className="flex justify-end gap-2 pt-1">
+                          <div className="flex justify-end gap-2">
                             <button
-                              onClick={() => setEditingSiteId(null)}
-                              className="px-2 py-1 text-xs text-gray-400 hover:text-white rounded hover:bg-white/10"
+                              onClick={() => setIsAddingSite(false)}
+                              className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                             >
                               Cancel
                             </button>
                             <button
-                              onClick={handleUpdateSite}
-                              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                              onClick={handleAddSite}
+                              className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
                             >
-                              Save
+                              Save Site
                             </button>
                           </div>
                         </div>
-                      ) : (
-                        <>
-                          <div className="pr-16">
-                            <div className="font-medium text-white mb-0.5">{site.name}</div>
-                            <div className="text-xs text-gray-500 truncate">{site.url}</div>
-                          </div>
-                          {site.id && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-[#2a2a2a] rounded-lg shadow-xl p-1 border border-white/5">
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleEditClick(site as any);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-white/5 rounded-md transition-colors"
-                                title="Edit Site"
-                              >
-                                <Pencil className="w-3.5 h-3.5" />
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleDeleteSite(site.id as string);
-                                }}
-                                className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/5 rounded-md transition-colors"
-                                title="Remove Site"
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </button>
-                            </div>
-                          )}
-                        </>
                       )}
+
+                      {/* Site List */}
+                      <div className="space-y-2">
+                        {sites.length === 0 && !isAddingSite && (
+                          <div className="text-center py-8 text-gray-500 text-sm">
+                            No saved sites yet.
+                          </div>
+                        )}
+
+                        {sites.map((site, idx) => (
+                          <div key={site.id || idx} className={clsx(
+                            "group relative border p-3 rounded-xl transition-all",
+                            editingSiteId === site.id ? "bg-white/10 border-purple-500/50" : "bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10 cursor-pointer"
+                          )}
+                            onClick={() => {
+                              if (editingSiteId === site.id) return;
+                              setUrl(site.url);
+                              setIsSiteModalOpen(false);
+                            }}
+                          >
+                            {editingSiteId === site.id ? (
+                              <div className="space-y-2" onClick={e => e.stopPropagation()}>
+                                <input
+                                  value={editSiteName}
+                                  onChange={e => setEditSiteName(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-sm text-white focus:border-purple-500 outline-none"
+                                  placeholder="Site Name"
+                                  autoFocus
+                                />
+                                <input
+                                  value={editSiteUrl}
+                                  onChange={e => setEditSiteUrl(e.target.value)}
+                                  className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-xs text-gray-300 focus:border-purple-500 outline-none"
+                                  placeholder="URL"
+                                />
+                                <div className="flex justify-end gap-2 pt-1">
+                                  <button
+                                    onClick={() => setEditingSiteId(null)}
+                                    className="px-2 py-1 text-xs text-gray-400 hover:text-white rounded hover:bg-white/10"
+                                  >
+                                    Cancel
+                                  </button>
+                                  <button
+                                    onClick={handleUpdateSite}
+                                    className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                                  >
+                                    Save
+                                  </button>
+                                </div>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="pr-16">
+                                  <div className="font-medium text-white mb-0.5">{site.name}</div>
+                                  <div className="text-xs text-gray-500 truncate">{site.url}</div>
+                                </div>
+                                {site.id && (
+                                  <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-[#2a2a2a] rounded-lg shadow-xl p-1 border border-white/5">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleEditClick(site as any);
+                                      }}
+                                      className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-white/5 rounded-md transition-colors"
+                                      title="Edit Site"
+                                    >
+                                      <Pencil className="w-3.5 h-3.5" />
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleDeleteSite(site.id as string);
+                                      }}
+                                      className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/5 rounded-md transition-colors"
+                                      title="Remove Site"
+                                    >
+                                      <Trash2 className="w-3.5 h-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+
                     </div>
-                  ))}
+
+                  </div>
                 </div>
+              )
+            }
 
-              </div>
-
-            </div>
-          </div>
-        )
-      }
-
-      {/* Image Preview Modal */}
-      {
-        previewImage && (
-          <div
-            className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-200"
-            onClick={() => setPreviewImage(null)}
-          >
-            <div className="relative max-w-5xl w-full max-h-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
-              <button
-                onClick={() => setPreviewImage(null)}
-                className="absolute -top-12 right-0 text-gray-400 hover:text-white transition-colors"
-              >
-                <X className="w-8 h-8" />
-              </button>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={previewImage}
-                alt="Preview"
-                className="w-auto h-auto max-w-full max-h-[85vh] rounded-lg shadow-2xl border border-white/10"
-              />
-              <div className="mt-4 flex gap-4">
-                <button
+            {/* Image Preview Modal */}
+            {
+              previewImage && (
+                <div
+                  className="fixed inset-0 z-[200] bg-black/90 backdrop-blur-md flex items-center justify-center p-8 animate-in fade-in duration-200"
                   onClick={() => setPreviewImage(null)}
-                  className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold transition-colors"
                 >
-                  Close
-                </button>
-                <a
-                  href={previewImage}
-                  download={`scene_image_${Date.now()}.jpg`}
-                  className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors flex items-center gap-2"
-                  onClick={(e) => e.stopPropagation()}
-                >
-                  <Upload className="w-4 h-4 rotate-180" /> Download
-                </a>
-              </div>
-            </div>
-          </div>
-        )
-      }
-      {/* Save Options Modal */}
-      {
-        showSaveOptions && (
-          <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
-              <h3 className="text-xl font-bold text-white mb-2">Save Project</h3>
-              <p className="text-gray-400 text-sm">
-                How would you like to save your changes?
-              </p>
-
-              <div className="space-y-3 pt-2">
-                <div>
-                  <label className="text-xs text-gray-400 block mb-1">Version Memo</label>
-                  <input
-                    value={saveMemo}
-                    onChange={(e) => setSaveMemo(e.target.value)}
-                    placeholder="e.g. Changed Intro Music"
-                    className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none"
-                  />
+                  <div className="relative max-w-5xl w-full max-h-full flex flex-col items-center" onClick={e => e.stopPropagation()}>
+                    <button
+                      onClick={() => setPreviewImage(null)}
+                      className="absolute -top-12 right-0 text-gray-400 hover:text-white transition-colors"
+                    >
+                      <X className="w-8 h-8" />
+                    </button>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={previewImage}
+                      alt="Preview"
+                      className="w-auto h-auto max-w-full max-h-[85vh] rounded-lg shadow-2xl border border-white/10"
+                    />
+                    <div className="mt-4 flex gap-4">
+                      <button
+                        onClick={() => setPreviewImage(null)}
+                        className="px-6 py-2 rounded-full bg-white/10 hover:bg-white/20 text-white font-bold transition-colors"
+                      >
+                        Close
+                      </button>
+                      <a
+                        href={previewImage}
+                        download={`scene_image_${Date.now()}.jpg`}
+                        className="px-6 py-2 rounded-full bg-blue-600 hover:bg-blue-500 text-white font-bold transition-colors flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Upload className="w-4 h-4 rotate-180" /> Download
+                      </a>
+                    </div>
+                  </div>
                 </div>
-                <button
-                  onClick={() => handleSaveProject(true, 'pre')}
-                  disabled={isProcessing}
-                  className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
-                >
-                  {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
-                  Save
-                </button>
+              )
+            }
+            {/* Save Options Modal */}
+            {
+              showSaveOptions && (
+                <div className="fixed inset-0 z-[300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+                  <div className="bg-[#1a1a1a] w-full max-w-sm rounded-2xl border border-white/10 shadow-2xl p-6 space-y-4">
+                    <h3 className="text-xl font-bold text-white mb-2">Save Project</h3>
+                    <p className="text-gray-400 text-sm">
+                      How would you like to save your changes?
+                    </p>
 
-                <button
-                  onClick={() => {
-                    if (!saveMemo || !saveMemo.trim()) {
-                      alert("Please enter a Version Memo to save as a new version.");
-                      return;
-                    }
-                    handleSaveProject(true, 'snapshot');
+                    <div className="space-y-3 pt-2">
+                      <div>
+                        <label className="text-xs text-gray-400 block mb-1">Version Memo</label>
+                        <input
+                          value={saveMemo}
+                          onChange={(e) => setSaveMemo(e.target.value)}
+                          placeholder="e.g. Changed Intro Music"
+                          className="w-full bg-black/40 border border-white/10 rounded-lg p-3 text-sm text-white focus:border-blue-500 outline-none"
+                        />
+                      </div>
+                      <button
+                        onClick={() => handleSaveProject(true, 'pre')}
+                        disabled={isProcessing}
+                        className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-500 text-white rounded-xl font-bold transition-all flex items-center justify-center gap-2"
+                      >
+                        {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Save className="w-4 h-4" />}
+                        Save
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if (!saveMemo || !saveMemo.trim()) {
+                            alert("Please enter a Version Memo to save as a new version.");
+                            return;
+                          }
+                          handleSaveProject(true, 'snapshot');
+                        }}
+                        disabled={isProcessing}
+                        className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
+                      >
+                        <HistoryIcon className="w-4 h-4" />
+                        Save as New Version
+                      </button>
+                    </div>
+
+                    <button
+                      onClick={() => setShowSaveOptions(false)}
+                      className="w-full py-2 text-gray-500 hover:text-white text-sm transition-colors mt-2"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              )
+            }
+            {
+              showSNSModal && (currentProjectId || selectedProject) && (
+                <SNSUploadModal
+                  project={selectedProject ? {
+                    id: selectedProject.id,
+                    title: selectedProject.title,
+                    videoPath: selectedProject.videoPath,
+                    description: selectedProject.description
+                  } : {
+                    id: currentProjectId!,
+                    title: projectTitle,
+                    videoPath: "",
                   }}
-                  disabled={isProcessing}
-                  className="w-full py-3 px-4 bg-white/5 hover:bg-white/10 border border-white/10 text-white rounded-xl font-medium transition-all flex items-center justify-center gap-2"
-                >
-                  <HistoryIcon className="w-4 h-4" />
-                  Save as New Version
-                </button>
-              </div>
+                  onClose={() => setShowSNSModal(false)}
+                  onUploadSuccess={async (url: string) => {
+                    alert("Upload Successful: " + url);
+                    setShowSNSModal(false);
 
-              <button
-                onClick={() => setShowSaveOptions(false)}
-                className="w-full py-2 text-gray-500 hover:text-white text-sm transition-colors mt-2"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )
-      }
-      {
-        showSNSModal && (currentProjectId || selectedProject) && (
-          <SNSUploadModal
-            project={selectedProject ? {
-              id: selectedProject.id,
-              title: selectedProject.title,
-              videoPath: selectedProject.videoPath,
-              description: selectedProject.description
-            } : {
-              id: currentProjectId!,
-              title: projectTitle,
-              videoPath: "",
-            }}
-            onClose={() => setShowSNSModal(false)}
-            onUploadSuccess={async (url: string) => {
-              alert("Upload Successful: " + url);
-              setShowSNSModal(false);
+                    // 1. Refresh global list (Grid View)
+                    await fetchServerProjects();
 
-              // 1. Refresh global list (Grid View)
-              await fetchServerProjects();
-
-              // 2. If viewing details (Gallery), refresh that specific project to see new history
-              if (selectedProject) {
-                try {
-                  const res = await fetch(`/api/projects?id=${selectedProject.id}`);
-                  const data = await res.json();
-                  // Ensure we preserve any local view state if needed, but data has the fresh uploads
-                  setSelectedProject(data);
-                } catch (e) {
-                  console.error("Failed to refresh project details", e);
-                }
-              }
-            }}
-          />
-        )
-      }
-      {
-        showSNSManager && (
-          <SNSManagerModal onClose={() => setShowSNSManager(false)} />
-        )
-      }
-      {/* Image Crop Modal */}
-      {cropModal?.isOpen && (
-        <ImageCropModal
-          imageUrl={cropModal.imageUrl}
-          targetWidth={cropModal.targetW}
-          targetHeight={cropModal.targetH}
-          onConfirm={(croppedUrl) => {
-            setSceneItems(prev => {
-              const updated = [...prev];
-              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: croppedUrl, status: 'approved' as any };
-              return updated;
-            });
-            setCropModal(null);
-          }}
-          onUseOriginal={() => {
-            setSceneItems(prev => {
-              const updated = [...prev];
-              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: cropModal.imageUrl, status: 'approved' as any };
-              return updated;
-            });
-            setCropModal(null);
-          }}
-          onClose={() => setCropModal(null)}
-        />
-      )}
-    </main >
-  );
+                    // 2. If viewing details (Gallery), refresh that specific project to see new history
+                    if (selectedProject) {
+                      try {
+                        const res = await fetch(`/api/projects?id=${selectedProject.id}`);
+                        const data = await res.json();
+                        // Ensure we preserve any local view state if needed, but data has the fresh uploads
+                        setSelectedProject(data);
+                      } catch (e) {
+                        console.error("Failed to refresh project details", e);
+                      }
+                    }
+                  }}
+                />
+              )
+            }
+            {
+              showSNSManager && (
+                <SNSManagerModal onClose={() => setShowSNSManager(false)} />
+              )
+            }
+            {/* Image Crop Modal */}
+            {cropModal?.isOpen && (
+              <ImageCropModal
+                imageUrl={cropModal.imageUrl}
+                targetWidth={cropModal.targetW}
+                targetHeight={cropModal.targetH}
+                onConfirm={(croppedUrl) => {
+                  setSceneItems(prev => {
+                    const updated = [...prev];
+                    updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: croppedUrl, status: 'approved' as any };
+                    return updated;
+                  });
+                  setCropModal(null);
+                }}
+                onUseOriginal={() => {
+                  setSceneItems(prev => {
+                    const updated = [...prev];
+                    updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: cropModal.imageUrl, status: 'approved' as any };
+                    return updated;
+                  });
+                  setCropModal(null);
+                }}
+                onClose={() => setCropModal(null)}
+              />
+            )}
+          </main >
+        );
 }
