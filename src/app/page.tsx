@@ -324,65 +324,64 @@ export default function Home() {
   const [bgmDucking, setBgmDucking] = useState(0.3);
 
   // Scene Template state
-  const [savedTemplates, setSavedTemplates] = useState<{ name: string; scenes: SceneItem[] }[]>([]);
+  const [savedTemplates, setSavedTemplates] = useState<{ id: string; name: string; scenes: SceneItem[] }[]>([]);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
   const [templateLoadDialog, setTemplateLoadDialog] = useState<{ idx: number } | null>(null);
+  const [isTemplateSaving, setIsTemplateSaving] = useState(false);
 
   // Bulk Upload Dialog state
   const [bulkUploadDialog, setBulkUploadDialog] = useState<{ files: File[] } | null>(null);
 
+  // Load templates from AirTable on mount
   useEffect(() => {
-    try {
-      const stored = localStorage.getItem('scene-templates');
-      if (stored) setSavedTemplates(JSON.parse(stored));
-    } catch (e) { /* ignore */ }
+    (async () => {
+      try {
+        const res = await fetch('/api/templates');
+        if (res.ok) {
+          const data = await res.json();
+          setSavedTemplates(data.templates || []);
+        }
+      } catch (e) { /* ignore */ }
+    })();
   }, []);
-
-  // Convert image URL to base64 data URL
-  const imageToBase64 = (url: string): Promise<string | null> => {
-    return new Promise((resolve) => {
-      if (!url) { resolve(null); return; }
-      if (url.startsWith('data:')) { resolve(url); return; }
-      const img = new Image();
-      img.crossOrigin = 'anonymous';
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          canvas.width = img.naturalWidth;
-          canvas.height = img.naturalHeight;
-          const ctx = canvas.getContext('2d');
-          ctx?.drawImage(img, 0, 0);
-          resolve(canvas.toDataURL('image/jpeg', 0.7));
-        } catch { resolve(null); }
-      };
-      img.onerror = () => resolve(null);
-      img.src = url;
-    });
-  };
 
   const handleSaveTemplate = async () => {
     const name = prompt('\ud15c\ud50c\ub9bf \uc774\ub984\uc744 \uc785\ub825\ud558\uc138\uc694:');
     if (!name || !name.trim()) return;
-    // Convert all images to base64
-    const scenesWithImages = await Promise.all(
-      sceneItems.map(async (s) => {
-        const base64 = s.imageUrl ? await imageToBase64(s.imageUrl) : null;
-        return {
-          ...s,
-          imageUrl: base64,
-          status: base64 ? 'approved' as const : 'pending' as const,
-          audioUrl: null,
-          audioDuration: undefined,
-        };
-      })
-    );
-    const template = { name: name.trim(), scenes: scenesWithImages };
-    const updated = [...savedTemplates.filter(t => t.name !== name.trim()), template];
-    setSavedTemplates(updated);
+    setIsTemplateSaving(true);
     try {
-      localStorage.setItem('scene-templates', JSON.stringify(updated));
+      // Check if template with same name exists — update it
+      const existing = savedTemplates.find(t => t.name === name.trim());
+      const scenesToSave = sceneItems.map(s => ({
+        ...s,
+        imageUrl: null, // Don't store images in AirTable (too large for Long Text fields)
+        status: 'pending' as const,
+        audioUrl: null,
+        audioDuration: undefined,
+      }));
+      const res = await fetch('/api/templates', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          id: existing?.id,
+          name: name.trim(),
+          scenes: scenesToSave,
+        }),
+      });
+      if (res.ok) {
+        // Reload templates
+        const listRes = await fetch('/api/templates');
+        if (listRes.ok) {
+          const data = await listRes.json();
+          setSavedTemplates(data.templates || []);
+        }
+      } else {
+        alert('\ud15c\ud50c\ub9bf \uc800\uc7a5 \uc2e4\ud328');
+      }
     } catch (e) {
-      alert('\ud15c\ud50c\ub9bf \uc800\uc7a5 \uc2e4\ud328: \uc774\ubbf8\uc9c0 \ub370\uc774\ud130\uac00 \ub108\ubb34 \ud07d\ub2c8\ub2e4. \uc774\ubbf8\uc9c0 \uc218\ub97c \uc904\uc5ec\uc8fc\uc138\uc694.');
+      alert('\ud15c\ud50c\ub9bf \uc800\uc7a5 \uc2e4\ud328');
+    } finally {
+      setIsTemplateSaving(false);
     }
   };
 
@@ -398,11 +397,22 @@ export default function Home() {
     setTemplateLoadDialog(null);
   };
 
-  const handleDeleteTemplate = (idx: number) => {
-    if (!confirm(`"${savedTemplates[idx].name}" \ud15c\ud50c\ub9bf\uc744 \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?`)) return;
-    const updated = savedTemplates.filter((_, i) => i !== idx);
-    setSavedTemplates(updated);
-    localStorage.setItem('scene-templates', JSON.stringify(updated));
+  const handleDeleteTemplate = async (idx: number) => {
+    const template = savedTemplates[idx];
+    if (!template) return;
+    if (!confirm(`"${template.name}" \ud15c\ud50c\ub9bf\uc744 \uc0ad\uc81c\ud558\uc2dc\uaca0\uc2b5\ub2c8\uae4c?`)) return;
+    try {
+      const res = await fetch('/api/templates', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: template.id }),
+      });
+      if (res.ok) {
+        setSavedTemplates(prev => prev.filter((_, i) => i !== idx));
+      }
+    } catch (e) {
+      alert('\ud15c\ud50c\ub9bf \uc0ad\uc81c \uc2e4\ud328');
+    }
   };
 
   // Narration State
@@ -3220,9 +3230,11 @@ export default function Home() {
                         <div className="p-2 border-b border-white/10">
                           <button
                             onClick={handleSaveTemplate}
-                            className="w-full text-left px-3 py-2 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center gap-2 transition-colors"
+                            disabled={isTemplateSaving}
+                            className="w-full text-left px-3 py-2 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center gap-2 transition-colors disabled:opacity-50"
                           >
-                            <Save className="w-3 h-3" /> Save Current as Template
+                            {isTemplateSaving ? <Loader2 className="w-3 h-3 animate-spin" /> : <Save className="w-3 h-3" />}
+                            {isTemplateSaving ? 'Saving...' : 'Save Current as Template'}
                           </button>
                         </div>
                         {savedTemplates.length === 0 ? (
