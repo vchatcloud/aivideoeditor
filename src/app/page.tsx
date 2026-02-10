@@ -326,6 +326,10 @@ export default function Home() {
   // Scene Template state
   const [savedTemplates, setSavedTemplates] = useState<{ name: string; scenes: SceneItem[] }[]>([]);
   const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+  const [templateLoadDialog, setTemplateLoadDialog] = useState<{ idx: number } | null>(null);
+
+  // Bulk Upload Dialog state
+  const [bulkUploadDialog, setBulkUploadDialog] = useState<{ files: File[] } | null>(null);
 
   useEffect(() => {
     try {
@@ -334,30 +338,64 @@ export default function Home() {
     } catch (e) { /* ignore */ }
   }, []);
 
-  const handleSaveTemplate = () => {
-    const name = prompt('\ud15c\ud50c\ub9bf \uc774\ub984\uc744 \uc785\ub825\ud558\uc138\uc694:');
-    if (!name || !name.trim()) return;
-    const template = {
-      name: name.trim(),
-      scenes: sceneItems.map(s => ({
-        ...s,
-        imageUrl: null,
-        status: 'pending' as const,
-        audioUrl: null,
-        audioDuration: undefined,
-      }))
-    };
-    const updated = [...savedTemplates.filter(t => t.name !== name.trim()), template];
-    setSavedTemplates(updated);
-    localStorage.setItem('scene-templates', JSON.stringify(updated));
+  // Convert image URL to base64 data URL
+  const imageToBase64 = (url: string): Promise<string | null> => {
+    return new Promise((resolve) => {
+      if (!url) { resolve(null); return; }
+      if (url.startsWith('data:')) { resolve(url); return; }
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = img.naturalWidth;
+          canvas.height = img.naturalHeight;
+          const ctx = canvas.getContext('2d');
+          ctx?.drawImage(img, 0, 0);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        } catch { resolve(null); }
+      };
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
   };
 
-  const handleLoadTemplate = (idx: number) => {
+  const handleSaveTemplate = async () => {
+    const name = prompt('\ud15c\ud50c\ub9bf \uc774\ub984\uc744 \uc785\ub825\ud558\uc138\uc694:');
+    if (!name || !name.trim()) return;
+    // Convert all images to base64
+    const scenesWithImages = await Promise.all(
+      sceneItems.map(async (s) => {
+        const base64 = s.imageUrl ? await imageToBase64(s.imageUrl) : null;
+        return {
+          ...s,
+          imageUrl: base64,
+          status: base64 ? 'approved' as const : 'pending' as const,
+          audioUrl: null,
+          audioDuration: undefined,
+        };
+      })
+    );
+    const template = { name: name.trim(), scenes: scenesWithImages };
+    const updated = [...savedTemplates.filter(t => t.name !== name.trim()), template];
+    setSavedTemplates(updated);
+    try {
+      localStorage.setItem('scene-templates', JSON.stringify(updated));
+    } catch (e) {
+      alert('\ud15c\ud50c\ub9bf \uc800\uc7a5 \uc2e4\ud328: \uc774\ubbf8\uc9c0 \ub370\uc774\ud130\uac00 \ub108\ubb34 \ud07d\ub2c8\ub2e4. \uc774\ubbf8\uc9c0 \uc218\ub97c \uc904\uc5ec\uc8fc\uc138\uc694.');
+    }
+  };
+
+  const handleLoadTemplate = (idx: number, includeImages: boolean) => {
     const template = savedTemplates[idx];
     if (!template) return;
-    if (!confirm(`"${template.name}" \ud15c\ud50c\ub9bf\uc744 \ubd88\ub7ec\uc624\uc2dc\uaca0\uc2b5\ub2c8\uae4c? \ud604\uc7ac \uc52c\uc774 \uad50\uccb4\ub429\ub2c8\ub2e4.`)) return;
-    setSceneItems(template.scenes.map(s => ({ ...s })));
+    setSceneItems(template.scenes.map(s => ({
+      ...s,
+      imageUrl: includeImages ? s.imageUrl : null,
+      status: includeImages && s.imageUrl ? 'approved' as const : 'pending' as const,
+    })));
     setShowTemplateMenu(false);
+    setTemplateLoadDialog(null);
   };
 
   const handleDeleteTemplate = (idx: number) => {
@@ -3194,11 +3232,13 @@ export default function Home() {
                             {savedTemplates.map((t, i) => (
                               <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors group">
                                 <button
-                                  onClick={() => handleLoadTemplate(i)}
+                                  onClick={() => setTemplateLoadDialog({ idx: i })}
                                   className="flex-1 text-left text-xs text-gray-300 hover:text-white truncate"
                                 >
                                   {t.name}
-                                  <span className="ml-2 text-gray-600 text-[10px]">{t.scenes.length} scenes</span>
+                                  <span className="ml-2 text-gray-600 text-[10px]">
+                                    {t.scenes.length} scenes{t.scenes.filter(s => s.imageUrl).length > 0 && ` · ${t.scenes.filter(s => s.imageUrl).length} 📷`}
+                                  </span>
                                 </button>
                                 <button
                                   onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(i); }}
@@ -3223,16 +3263,7 @@ export default function Home() {
                     onChange={(e) => {
                       const files = Array.from(e.target.files || []);
                       if (files.length === 0) return;
-                      setSceneItems(prev => {
-                        const updated = [...prev];
-                        files.forEach((file, i) => {
-                          if (i < updated.length) {
-                            const url = URL.createObjectURL(file);
-                            updated[i] = { ...updated[i], imageUrl: url, status: 'approved' as any };
-                          }
-                        });
-                        return updated;
-                      });
+                      setBulkUploadDialog({ files });
                       e.target.value = '';
                     }}
                   />
@@ -6241,6 +6272,120 @@ export default function Home() {
           <SNSManagerModal onClose={() => setShowSNSManager(false)} />
         )
       }
+      {/* Template Load Dialog */}
+      {templateLoadDialog && savedTemplates[templateLoadDialog.idx] && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-white/5 bg-white/5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <LayoutTemplate className="w-5 h-5 text-purple-400" />
+                템플릿 불러오기
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                &quot;{savedTemplates[templateLoadDialog.idx].name}&quot; — {savedTemplates[templateLoadDialog.idx].scenes.length}개 씬
+                {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 &&
+                  ` (${savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개 이미지 포함)`}
+              </p>
+            </div>
+            <div className="p-5 space-y-3">
+              <p className="text-xs text-gray-500 mb-3">현재 씬이 템플릿으로 교체됩니다.</p>
+              {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 && (
+                <button
+                  onClick={() => handleLoadTemplate(templateLoadDialog.idx, true)}
+                  className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4" /> 이미지 포함하여 불러오기
+                </button>
+              )}
+              <button
+                onClick={() => handleLoadTemplate(templateLoadDialog.idx, false)}
+                className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <FileText className="w-4 h-4" /> 텍스트만 불러오기
+              </button>
+              <button
+                onClick={() => setTemplateLoadDialog(null)}
+                className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Bulk Upload Mode Dialog */}
+      {bulkUploadDialog && (
+        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+            <div className="p-5 border-b border-white/5 bg-white/5">
+              <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                <Upload className="w-5 h-5 text-blue-400" />
+                이미지 일괄 업로드
+              </h3>
+              <p className="text-xs text-gray-400 mt-1">
+                {bulkUploadDialog.files.length}개 이미지가 선택되었습니다
+              </p>
+            </div>
+            <div className="p-5 space-y-3">
+              <button
+                onClick={() => {
+                  const { files } = bulkUploadDialog;
+                  setSceneItems(prev => {
+                    const updated = [...prev];
+                    files.forEach((file, i) => {
+                      if (i < updated.length) {
+                        const url = URL.createObjectURL(file);
+                        updated[i] = { ...updated[i], imageUrl: url, status: 'approved' as any };
+                      }
+                    });
+                    return updated;
+                  });
+                  setBulkUploadDialog(null);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <Pencil className="w-4 h-4" /> 기존 씬 이미지 교체
+                <span className="text-[10px] opacity-70 font-normal">(씬 1~{Math.min(bulkUploadDialog.files.length, sceneItems.length)})</span>
+              </button>
+              <button
+                onClick={() => {
+                  const { files } = bulkUploadDialog;
+                  setSceneItems(prev => {
+                    const newScenes: SceneItem[] = files.map((file, i) => ({
+                      text: '',
+                      subtitle: '',
+                      title: `Scene ${prev.length + i + 1}`,
+                      imageUrl: URL.createObjectURL(file),
+                      imagePrompt: '',
+                      status: 'approved' as any,
+                      duration: 8,
+                      transition: 'fade' as any,
+                      audioUrl: null,
+                      audioDuration: 0,
+                      isEnabled: true,
+                      isAudioGenerating: false,
+                    }));
+                    return [...prev, ...newScenes];
+                  });
+                  setBulkUploadDialog(null);
+                }}
+                className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <Plus className="w-4 h-4" /> 새로운 빈 씬 추가
+                <span className="text-[10px] opacity-70 font-normal">(+{bulkUploadDialog.files.length}개)</span>
+              </button>
+              <button
+                onClick={() => setBulkUploadDialog(null)}
+                className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
+              >
+                취소
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Image Crop Modal */}
       {cropModal?.isOpen && (
         <ImageCropModal
