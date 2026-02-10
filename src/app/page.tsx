@@ -319,6 +319,51 @@ export default function Home() {
   const [isPreviewingBGM, setIsPreviewingBGM] = useState(false);
   const bgmPreviewRef = useRef<HTMLAudioElement | null>(null);
 
+  // Scene Template state
+  const [savedTemplates, setSavedTemplates] = useState<{ name: string; scenes: SceneItem[] }[]>([]);
+  const [showTemplateMenu, setShowTemplateMenu] = useState(false);
+
+  // Load templates from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem('scene-templates');
+      if (stored) setSavedTemplates(JSON.parse(stored));
+    } catch { /* ignore */ }
+  }, []);
+
+  const handleSaveTemplate = () => {
+    const name = prompt('템플릿 이름을 입력하세요:');
+    if (!name || !name.trim()) return;
+    const template = {
+      name: name.trim(),
+      scenes: sceneItems.map(s => ({
+        ...s,
+        imageUrl: null, // Don't store blob URLs
+        status: 'pending' as const,
+        audioUrl: null,
+        audioDuration: undefined,
+      }))
+    };
+    const updated = [...savedTemplates.filter(t => t.name !== name.trim()), template];
+    setSavedTemplates(updated);
+    localStorage.setItem('scene-templates', JSON.stringify(updated));
+  };
+
+  const handleLoadTemplate = (idx: number) => {
+    const template = savedTemplates[idx];
+    if (!template) return;
+    if (!confirm(`"${template.name}" 템플릿을 불러오시겠습니까? 현재 씬이 교체됩니다.`)) return;
+    setSceneItems(template.scenes.map(s => ({ ...s })));
+    setShowTemplateMenu(false);
+  };
+
+  const handleDeleteTemplate = (idx: number) => {
+    if (!confirm(`"${savedTemplates[idx].name}" 템플릿을 삭제하시겠습니까?`)) return;
+    const updated = savedTemplates.filter((_, i) => i !== idx);
+    setSavedTemplates(updated);
+    localStorage.setItem('scene-templates', JSON.stringify(updated));
+  };
+
   // Narration State
   const [narrationEnabled, setNarrationEnabled] = useState(true);
   const [isNarrationReview, setIsNarrationReview] = useState(false);
@@ -3120,6 +3165,51 @@ export default function Home() {
                   <ImageIcon className="w-4 h-4" /> Scene List
                 </h3>
                 <div className="flex items-center gap-2">
+                  {/* Template Menu */}
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowTemplateMenu(!showTemplateMenu)}
+                      className="px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-gray-300 hover:text-white text-xs font-bold flex items-center gap-2 transition-all"
+                      title="Scene Templates"
+                    >
+                      <LayoutTemplate className="w-3 h-3" /> Templates
+                    </button>
+                    {showTemplateMenu && (
+                      <div className="absolute right-0 top-full mt-1 bg-gray-900 border border-white/10 rounded-lg shadow-2xl z-50 w-64 overflow-hidden animate-in fade-in slide-in-from-top-2 duration-200">
+                        <div className="p-2 border-b border-white/10">
+                          <button
+                            onClick={handleSaveTemplate}
+                            className="w-full text-left px-3 py-2 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 text-xs font-bold flex items-center gap-2 transition-colors"
+                          >
+                            <Save className="w-3 h-3" /> Save Current as Template
+                          </button>
+                        </div>
+                        {savedTemplates.length === 0 ? (
+                          <div className="p-4 text-center text-xs text-gray-500">No saved templates</div>
+                        ) : (
+                          <div className="max-h-48 overflow-y-auto custom-scrollbar">
+                            {savedTemplates.map((t, i) => (
+                              <div key={i} className="flex items-center justify-between px-3 py-2 hover:bg-white/5 transition-colors group">
+                                <button
+                                  onClick={() => handleLoadTemplate(i)}
+                                  className="flex-1 text-left text-xs text-gray-300 hover:text-white truncate"
+                                >
+                                  {t.name}
+                                  <span className="ml-2 text-gray-600 text-[10px]">{t.scenes.length} scenes</span>
+                                </button>
+                                <button
+                                  onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(i); }}
+                                  className="p-1 text-gray-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   <div className="text-right mr-2">
                     <span className="block text-[10px] text-gray-500 font-bold">EST. COST</span>
                     <span className="block text-xs text-purple-300 font-mono">₩{(sceneItems.filter(s => s.isEnabled !== false).length * 58).toLocaleString()}</span>
