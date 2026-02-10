@@ -352,13 +352,18 @@ export default function Home() {
     try {
       // Check if template with same name exists — update it
       const existing = savedTemplates.find(t => t.name === name.trim());
-      const scenesToSave = sceneItems.map(s => ({
-        ...s,
-        imageUrl: null, // Don't store images in AirTable (too large for Long Text fields)
-        status: 'pending' as const,
-        audioUrl: null,
-        audioDuration: undefined,
-      }));
+      const scenesToSave = sceneItems.map(s => {
+        // Keep server-side image URLs (e.g. /generated/..., /projects/...) — they're small strings
+        // Strip blob: URLs which are ephemeral
+        const persistentUrl = s.imageUrl && s.imageUrl.startsWith('/') ? s.imageUrl : null;
+        return {
+          ...s,
+          imageUrl: persistentUrl,
+          status: persistentUrl ? 'approved' as const : 'pending' as const,
+          audioUrl: null,
+          audioDuration: undefined,
+        };
+      });
       const res = await fetch('/api/templates', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6301,14 +6306,15 @@ export default function Home() {
             </div>
             <div className="p-5 space-y-3">
               <p className="text-xs text-gray-500 mb-3">현재 씬이 템플릿으로 교체됩니다.</p>
-              {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 && (
-                <button
-                  onClick={() => handleLoadTemplate(templateLoadDialog.idx, true)}
-                  className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-                >
-                  <ImageIcon className="w-4 h-4" /> 이미지 포함하여 불러오기
-                </button>
-              )}
+              <button
+                onClick={() => handleLoadTemplate(templateLoadDialog.idx, true)}
+                className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+              >
+                <ImageIcon className="w-4 h-4" /> 이미지 포함하여 불러오기
+                {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 && (
+                  <span className="text-[10px] opacity-70 font-normal">({savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개)</span>
+                )}
+              </button>
               <button
                 onClick={() => handleLoadTemplate(templateLoadDialog.idx, false)}
                 className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
