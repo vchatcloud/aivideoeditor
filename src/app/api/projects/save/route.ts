@@ -28,12 +28,24 @@ export async function POST(req: NextRequest) {
             fs.mkdirSync(projectDir, { recursive: true });
         }
 
+        // Read existing metadata if overwriting (to preserve videoPath, thumbnailPath, createdAt)
+        let existingMeta: any = {};
+        const existingMetaPath = path.join(projectDir, 'meta.json');
+        if (fs.existsSync(existingMetaPath)) {
+            try {
+                existingMeta = JSON.parse(fs.readFileSync(existingMetaPath, 'utf-8'));
+            } catch (e) {
+                console.warn('Failed to read existing meta.json, starting fresh');
+            }
+        }
+
         // Save Video if provided
+        const timestamp = Date.now();
         let videoFileName = "";
         if (videoFile && videoFile.size > 0) {
             const videoBuffer = Buffer.from(await videoFile.arrayBuffer());
             const videoExtension = videoFile.type.split('/')[1] || 'webm';
-            videoFileName = `video.${videoExtension}`;
+            videoFileName = `video_${timestamp}.${videoExtension}`;
             const videoPath = path.join(projectDir, videoFileName);
             fs.writeFileSync(videoPath, videoBuffer);
         }
@@ -43,25 +55,24 @@ export async function POST(req: NextRequest) {
         let thumbnailPathStr = "";
         if (thumbnailFile) {
             const thumbBuffer = Buffer.from(await thumbnailFile.arrayBuffer());
-            const thumbName = `thumbnail.jpg`; // Force jpg for simplicity, or detect
+            const thumbName = `thumbnail_${timestamp}.jpg`;
             const thumbPath = path.join(projectDir, thumbName);
             fs.writeFileSync(thumbPath, thumbBuffer);
             thumbnailPathStr = `/projects/${projectId}/${thumbName}`;
         }
 
-        // Save Metadata
-        // Save Metadata
+        // Save Metadata — preserve existing videoPath/thumbnailPath/createdAt when not uploading new files
         const savedMetadata = {
             ...metadata,
             id: projectId,
             title: metadata.title || 'Untitled Project',
-            createdAt: metadata.createdAt || new Date().toISOString(),
+            createdAt: existingMeta.createdAt || metadata.createdAt || new Date().toISOString(),
             updatedAt: new Date().toISOString(),
-            videoPath: videoFileName ? `/projects/${projectId}/${videoFileName}` : (metadata.videoPath || null),
-            thumbnailPath: thumbnailPathStr || (metadata.thumbnailPath || ""), // Keep existing if not updating
-            duration: metadata.duration || 0,
-            scenes: metadata.scenes || [],
-            usage: metadata.usage
+            videoPath: videoFileName ? `/projects/${projectId}/${videoFileName}` : (metadata.videoPath || existingMeta.videoPath || null),
+            thumbnailPath: thumbnailPathStr || (metadata.thumbnailPath || existingMeta.thumbnailPath || ""),
+            duration: metadata.duration || existingMeta.duration || 0,
+            scenes: metadata.scenes || existingMeta.scenes || [],
+            usage: metadata.usage || existingMeta.usage
         };
 
         fs.writeFileSync(path.join(projectDir, 'meta.json'), JSON.stringify(savedMetadata, null, 2));

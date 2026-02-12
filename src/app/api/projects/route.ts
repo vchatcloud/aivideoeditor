@@ -184,10 +184,10 @@ export async function GET(request: Request) {
         } else {
             // List all projects with creation time
             const records = await base('Projects').select({
-                maxRecords: 50, // Increased limit
-                sort: [{ field: "Name", direction: "desc" }], // Or any sort
-                view: "Grid view",
-            }).firstPage();
+                maxRecords: 200,
+                sort: [{ field: "Name", direction: "desc" }],
+                // Removed 'view' to prevent view-level filters from hiding records
+            }).all();
 
             const projects = records.map(record => {
                 const settingsStr = record.get('Settings') as string;

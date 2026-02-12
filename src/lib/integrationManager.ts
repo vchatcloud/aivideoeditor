@@ -16,7 +16,9 @@ const getAirtableBase = () => {
 
 const TABLE_NAME = 'Integrations';
 const TOKEN_FILE_MAP: Record<string, string> = {
-    'YouTube': 'youtube-tokens.json'
+    'YouTube': 'youtube-tokens.json',
+    'Instagram': 'instagram-tokens.json',
+    'TikTok': 'tiktok-tokens.json'
 };
 
 export const IntegrationManager = {

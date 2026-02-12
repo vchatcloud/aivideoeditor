@@ -15,7 +15,11 @@ export async function POST(req: Request) {
         const projectPath = path.join(projectsDir, projectId, 'project.json');
         const metaPath = path.join(projectsDir, projectId, 'meta.json');
 
-        if (!fs.existsSync(projectPath) && !fs.existsSync(metaPath)) {
+        // For Airtable-only projects, local files may not exist — skip the check
+        const hasLocalFiles = fs.existsSync(projectPath) || fs.existsSync(metaPath);
+        const isAirtableProject = projectId.startsWith('rec');
+
+        if (!hasLocalFiles && !isAirtableProject) {
             return NextResponse.json({ error: "Project not found" }, { status: 404 });
         }
 

@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import clsx from "clsx";
 import { Play, Pause, RotateCw, RotateCcw, X, FileVideo, Wand2, Upload, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, Sparkles, Video as VideoIcon, ThumbsUp, Pencil, Film, Clock, Globe, Calendar, FileText, Music, Settings, MessageSquare, Heart, RefreshCw, Save, Trash2, FolderOpen, ChevronRight, ChevronDown, Info, Palette, LayoutTemplate, QrCode, List, Plus, Copy, ShieldCheck, Square, History as HistoryIcon, ArrowUp, ArrowDown } from 'lucide-react';
@@ -7,255 +7,17 @@ import NarrationStudio, { VOICE_DATA } from "@/components/NarrationStudio";
 import SNSUploadModal from "@/components/SNSUploadModal";
 import SNSManagerModal from "@/components/SNSManagerModal";
 import ImageCropModal from "@/components/ImageCropModal";
+import ProjectGallery from "@/components/ProjectGallery";
 import QRCode from 'qrcode';
 
+// Shared Types & Constants
+import type { Scene, ProjectHistoryItem, ScrapedPost, AnalysisResult, SceneItem, CaptionConfig } from '@/types';
+import {
+  ASPECT_RATIOS, VISUAL_STYLES, COMPOSITION_STYLES, MOOD_STYLES,
+  INTERPRETATION_STYLES, CAPTION_PRESETS, FONT_DISPLAY_MAP, FONT_OPTIONS
+} from '@/constants';
+
 const NO_OP = () => { };
-
-interface Scene {
-  imageUrl: string;
-  text: string;
-  audioUrl?: string | null;
-}
-
-interface ProjectHistoryItem {
-  id: string;
-  name: string;
-  createdAt: string;
-  timestamp?: string;
-  thumbnailUrl?: string;
-  // Add other fields as needed based on usage
-}
-
-interface ScrapedPost {
-  title: string;
-  link: string;
-  date: string;
-  content: string;
-  images: string[];
-  files?: { name: string; url: string }[];
-}
-
-
-interface AnalysisResult {
-  imageAnalysis?: {
-    summary: string;
-    visualStyle: string;
-    imageComposition?: string;
-    imageMood?: string;
-    imageInterpretation?: string;
-    dominantColors: string[];
-  };
-  consistency?: {
-    character: string;
-    theme: string;
-  };
-  summary: string;
-  scenes: { text: string; title?: string; subtitle: string; imagePrompt: string }[];
-  suggestedStyles?: { name: string; description: string; colors: string[] }[];
-  extractedText?: string;
-  usage?: {
-    inputTokens: number;
-    outputTokens: number;
-    totalCostUSD: number;
-    estimatedCostKRW: number;
-  };
-}
-
-interface SceneItem {
-  text: string; // Used for Narration
-  title?: string; // Scene Title
-  imagePrompt: string;
-  imageUrl: string | null;
-  status: 'pending' | 'generating' | 'generated' | 'approved';
-  subtitle: string; // Used for Display
-  duration: number; // Duration in seconds
-  transition: 'none' | 'fade' | 'scale_up' | 'pop_in' | 'blink' | 'slide_left' | 'slide_right' | 'slide_up' | 'slide_down' | 'wipe_left' | 'wipe_right' | 'wipe_up' | 'wipe_down' | 'drop_in' | 'shake' | 'panorama_left' | 'panorama_right' | 'panorama_up' | 'panorama_down'; // Per-scene transition
-  audioUrl?: string | null; // Pre-generated audio
-  audioDuration?: number; // Audio length in seconds
-  isAudioGenerating?: boolean;
-  isEnabled: boolean;
-  narrationSettings?: {
-    voice?: string;      // Override global voice
-    speed?: number;      // Override global speed (0.5 - 2.0)
-    pitch?: number;      // Pitch shift in semitones (-12 to +12)
-    volume?: number;     // Volume multiplier (0.0 - 2.0)
-    prompt?: string;     // Custom acting instruction
-  };
-}
-
-
-
-
-export interface CaptionConfig {
-  enabled: boolean;
-  mode: 'standard' | 'dynamic';
-  dynamicStyle: {
-    preset: string; // e.g., 'yellow_punch'
-    fontFamily: string;
-    fontSize: number;
-    opacity?: number;
-    intensity?: number;
-    colors: {
-      activeFill: string;
-      baseFill: string;
-      stroke: string;
-      strokeThickness: number;
-    };
-    animation: 'none' | 'pop' | 'shake' | 'elastic';
-    layout: {
-      wordsPerLine: number; // 0 = Auto
-      safeZonePadding: boolean;
-      verticalPosition: 'top' | 'middle' | 'bottom';
-    };
-  };
-}
-
-const ASPECT_RATIOS = [
-  { label: "16:9", width: 1920, height: 1080, description: "YouTube / TV" },
-  { label: "9:16", width: 1080, height: 1920, description: "Shorts / TikTok" },
-  { label: "1:1", width: 1080, height: 1080, description: "Instagram Feed" },
-  { label: "4:5", width: 1080, height: 1350, description: "Facebook / Insta Portrait" },
-] as const;
-
-const VISUAL_STYLES = [
-  { id: "Photorealistic", label: "Photorealistic", image: "/images/styles/photorealistic.png", description: "Real world photo style" },
-  { id: "3D Isometric", label: "3D Isometric", image: "/images/styles/3d_render.png", description: "Cute & Clean 3D" },
-  { id: "Flat Vector", label: "Flat Vector", image: "/images/styles/vector_art.png", description: "Clean Graphic Style" },
-  { id: "Hand-Drawn", label: "Hand-Drawn", image: "/images/styles/watercolor.png", description: "Artistic Sketch Style" },
-] as const;
-
-const COMPOSITION_STYLES = [
-  { id: "Wide", label: "Wide / Text Space", description: "Subject on right, empty space on left" },
-  { id: "Center", label: "Center Focus", description: "Subject in center, symmetrical" },
-  { id: "Knolling", label: "Knolling", description: "Objects arranged neatly at 90 degrees" },
-  { id: "Macro", label: "Macro / Detail", description: "Extreme close-up, depth of field" },
-] as const;
-
-const MOOD_STYLES = [
-  { id: "Trustworthy", label: "Trustworthy", description: "Blue tones, professional, bright" },
-  { id: "Urgent", label: "Urgent / Alert", description: "High contrast, red/yellow accents" },
-  { id: "Eco", label: "Eco & Healthy", description: "Greenery, soft sunlight, organic" },
-  { id: "Energetic", label: "Energetic", description: "Vibrant colors, dynamic motion" },
-] as const;
-
-const INTERPRETATION_STYLES = [
-  { id: "Literal", label: "Literal", description: "Describe text as-is" },
-  { id: "Metaphorical", label: "Metaphorical", description: "Visual metaphors & symbols" },
-  { id: "Abstract", label: "Abstract", description: "Flows, patterns, and shapes" },
-] as const;
-
-const CAPTION_PRESETS = [
-  {
-    id: 'yellow_punch',
-    label: '🟡 Yellow Punch (Popular)',
-    style: {
-      fontSize: 90,
-      colors: { activeFill: '#FFD700', baseFill: '#FFFFFF', stroke: '#000000', strokeThickness: 8 },
-      animation: 'pop',
-      layout: { wordsPerLine: 2, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'cinematic_teal_orange',
-    label: '🎬 Cinematic Teal & Orange',
-    style: {
-      fontSize: 85,
-      colors: { activeFill: '#FF8C00', baseFill: '#E0F7FA', stroke: '#004D40', strokeThickness: 6 },
-      animation: 'none',
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'bottom' }
-    }
-  },
-  {
-    id: 'nostalgic_film',
-    label: '📼 Nostalgic Film',
-    style: {
-      fontSize: 80,
-      colors: { activeFill: '#F4E1D2', baseFill: '#D7CCC8', stroke: '#5D4037', strokeThickness: 4 },
-      animation: 'none', // Grain effect is video filter, text is clean but sepia
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'bottom' }
-    }
-  },
-  {
-    id: 'high_contrast_bw',
-    label: '⚫ High Contrast B&W',
-    style: {
-      fontSize: 95,
-      colors: { activeFill: '#FFFFFF', baseFill: '#000000', stroke: '#FFFFFF', strokeThickness: 2 }, // Inverted for impact? Or White Text on Black Stroke
-      animation: 'pop',
-      layout: { wordsPerLine: 1, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'muted_pastel',
-    label: '🌸 Muted Pastel',
-    style: {
-      fontSize: 85,
-      colors: { activeFill: '#FFB7B2', baseFill: '#E2F0CB', stroke: '#9E9E9E', strokeThickness: 4 },
-      animation: 'elastic',
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'dark_mood_cyber',
-    label: '👾 Dark Mood / Cyber',
-    style: {
-      fontSize: 90,
-      colors: { activeFill: '#00FFFF', baseFill: '#1A1A1A', stroke: '#9D00FF', strokeThickness: 6 },
-      animation: 'shake',
-      layout: { wordsPerLine: 2, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'minimal_white',
-    label: '⚪ Minimal White',
-    style: {
-      fontSize: 70,
-      colors: { activeFill: '#000000', baseFill: '#FFFFFF', stroke: '#E5E5E5', strokeThickness: 2 }, // Clean look
-      animation: 'none',
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'bottom' }
-    }
-  },
-  {
-    id: 'neon_glow',
-    label: '🟢 Neon Glow',
-    style: {
-      fontSize: 90,
-      colors: { activeFill: '#39ff14', baseFill: '#000000', stroke: '#39ff14', strokeThickness: 4 },
-      animation: 'shake',
-      layout: { wordsPerLine: 2, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'paper_texture',
-    label: '📜 Paper Texture',
-    style: {
-      fontSize: 80,
-      colors: { activeFill: '#3E2723', baseFill: '#FFF3E0', stroke: '#5D4037', strokeThickness: 3 }, // Dark Brown on Cream
-      animation: 'none',
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'bottom' }
-    }
-  },
-  {
-    id: 'glassmorphism',
-    label: '🧊 Glassmorphism',
-    style: {
-      fontSize: 80,
-      colors: { activeFill: '#FFFFFF', baseFill: 'rgba(255,255,255,0.7)', stroke: '#FFFFFF', strokeThickness: 1 }, // Semi-transparent base simulated
-      animation: 'none',
-      layout: { wordsPerLine: 0, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  },
-  {
-    id: 'pop_art',
-    label: '💥 Pop Art',
-    style: {
-      fontSize: 100,
-      colors: { activeFill: '#FFFF00', baseFill: '#FF0000', stroke: '#000000', strokeThickness: 8 }, // Comic book style
-      animation: 'pop',
-      layout: { wordsPerLine: 1, safeZonePadding: true, verticalPosition: 'middle' }
-    }
-  }
-] as const;
 
 export default function Home() {
   const [url, setUrl] = useState("https://www.seocho.go.kr/site/seocho/ex/bbs/List.do?cbIdx=57");
@@ -466,6 +228,7 @@ export default function Home() {
 
   const [subtitleSpeed, setSubtitleSpeed] = useState(1.0); // KEEPING FOR COMPATIBILITY IF NEEDED, BUT LIKELY NOT USED NOW
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(null);
+  const [currentGalleryId, setCurrentGalleryId] = useState<string | null>(null);
   const [savedProjects, setSavedProjects] = useState<{ id: string; name: string }[]>([]);
   const [showProjectList, setShowProjectList] = useState(false);
   const [projectHistory, setProjectHistory] = useState<ProjectHistoryItem[]>([]);
@@ -806,25 +569,7 @@ export default function Home() {
     setSeekRequest(startTime);
   }, [sceneItems, narrationSpeed]);
 
-  const fontDisplayMap: Record<string, string> = {
-    "Pretendard": "Pretendard (기본)",
-    "Nanum Gothic": "나눔고딕",
-    "Nanum Myeongjo": "나눔명조",
-    "Jua": "주아",
-    "Do Hyeon": "도현",
-    "Gothic A1": "고딕 A1",
-    "Noto Sans KR": "본고딕",
-    "Black Han Sans": "검은고딕",
-    "Sunflower": "해바라기",
-    "Stylish": "스타일리시",
-    "Gowun Dodum": "고운돋움",
-    "Sans-serif": "Sans-serif",
-    "Serif": "Serif",
-    "Monospace": "Monospace",
-    "Fantasy": "Fantasy",
-    "Cursive": "Cursive"
-  };
-  const fontOptions = Object.keys(fontDisplayMap);
+
 
   const handleRenderLog = useCallback((msg: string) => {
     setRenderLogs(prev => [...prev.slice(-10), msg]);
@@ -884,8 +629,13 @@ export default function Home() {
   const [bgmFiles, setBgmFiles] = useState<{ name: string, url: string }[]>([]);
   const [selectedBgm, setSelectedBgm] = useState<string>("");
 
+  // Actual Cost Tracking (accumulated only on real API calls)
+  const [actualImageCost, setActualImageCost] = useState(0);
+  const [actualAudioCost, setActualAudioCost] = useState(0);
+
   // Server Save & Gallery State
   const [isSaving, setIsSaving] = useState(false);
+  const [autoSaveOnRender, setAutoSaveOnRender] = useState(false);
   const [serverVideos, setServerVideos] = useState<any[]>([]);
   const [showServerGallery, setShowServerGallery] = useState(false);
   const [selectedProject, setSelectedProject] = useState<any | null>(null); // For Gallery Player
@@ -896,18 +646,18 @@ export default function Home() {
 
   const fetchServerProjects = async () => {
     try {
-      const res = await fetch('/api/projects/list');
+      const res = await fetch('/api/gallery');
       const data = await res.json();
       if (data.projects) setServerVideos(data.projects);
     } catch (e) {
-      console.error(e);
+      console.error('Gallery fetch error:', e);
     }
   };
 
   const handleUpdateProjectTitle = async (id: string, newTitle: string) => {
     if (!newTitle.trim()) return;
     try {
-      const res = await fetch('/api/projects/update', {
+      const res = await fetch('/api/gallery', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, title: newTitle })
@@ -927,12 +677,8 @@ export default function Home() {
     e.stopPropagation();
     if (!confirm("Are you sure you want to delete this project?")) return;
     try {
-      const res = await fetch('/api/projects/delete', {
+      const res = await fetch(`/api/gallery?id=${id}`, {
         method: 'DELETE',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ id }),
       });
 
       if (res.ok) {
@@ -1149,14 +895,14 @@ export default function Home() {
       let blob = videoBlobUrl ? await (await fetch(videoBlobUrl)).blob() : undefined;
 
       const scriptCost = analysisResult?.usage?.estimatedCostKRW || 0;
-      const imageCount = sceneItems.filter(s => s.imageUrl && s.status !== 'pending').length;
-      const imageCost = imageCount * 58;
-      const audioCost = sceneItems.reduce((acc, s) => acc + (s.audioUrl ? (s.text?.length || 0) * 0.05 : 0), 0);
+      const imageCost = actualImageCost;
+      const audioCost = actualAudioCost;
       const totalCost = scriptCost + imageCost + audioCost;
 
       // Logic for Project Name Grouping & Sequencing
-      let finalTitle = projectTitle || scrapedPost?.title || "Untitled Project";
+      let finalTitle = scrapedPost?.title || projectTitle || "Untitled Project";
       let finalId = overwrite ? currentProjectId : null;
+      let galleryId: string | null = overwrite ? currentGalleryId : null;
 
       if (!overwrite) {
         // "Save As New" -> Calculate Sequence
@@ -1231,12 +977,43 @@ export default function Home() {
           })
         });
         const airtableData = await airtableRes.json();
-        if (airtableData.id && !finalId) {
-          // Fallback for ID if FS didn't provide one (unlikely)
+        // Always update currentProjectId to the Airtable rec ID when a new record is created
+        // This ensures future saves update the same record instead of creating duplicates
+        if (airtableData.id && airtableData.id.startsWith('rec')) {
           setCurrentProjectId(airtableData.id);
+          finalId = airtableData.id;
+          console.log("Project synced to Airtable:", airtableData.id);
         }
       } catch (e) {
         console.error("Airtable sync failed", e);
+        // Warn the user that the project list won't show this project
+        alert("⚠️ Project saved locally, but failed to sync to project list. The project may not appear in 'Load' until next successful save.");
+      }
+
+      // Save lightweight metadata to Gallery table (Airtable)
+      try {
+        const galleryRes = await fetch('/api/gallery', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            ...(galleryId ? { id: galleryId } : {}),
+            projectId: finalId,
+            title: finalTitle,
+            groupTitle: finalTitle.replace(/ - \d+$/, "").trim(),
+            videoPath: fsData.project?.videoPath || '',
+            thumbnailPath: fsData.project?.thumbnailPath || '',
+            duration: totalDuration,
+            scriptCost, imageCost, audioCost, totalCost,
+            sceneCount: sceneItems.length,
+          })
+        });
+        const galleryData = await galleryRes.json();
+        if (galleryData.id) {
+          console.log("Gallery record saved:", galleryData.id);
+          setCurrentGalleryId(galleryData.id);
+        }
+      } catch (galErr) {
+        console.warn("Gallery table sync failed", galErr);
       }
 
       if (!blob) alert("Project saved successfully!");
@@ -1287,6 +1064,7 @@ export default function Home() {
     setProjectTitle(cleanTitle);
     setAnalysisResult(null);
     setSceneItems([]);
+    setCurrentProjectId(null); // Reset project ID for new post to prevent overwriting unrelated projects
     setError("");
     // Auto-select PDF files by default
     const initialFiles = new Set<string>();
@@ -1321,6 +1099,8 @@ export default function Home() {
     setIsProcessing(true);
     setError("");
     setAnalysisResult(null);
+    setActualImageCost(0);
+    setActualAudioCost(0);
 
     try {
       // 1. Pre-process text/images for upload if they are local blobs (Manual Mode)
@@ -1541,6 +1321,7 @@ export default function Home() {
         const data = await res.json();
 
         if (data.imageUrl) {
+          setActualImageCost(prev => prev + 58);
           setSceneItems(prev => {
             const updated = [...prev];
             updated[idx] = {
@@ -1664,6 +1445,7 @@ export default function Home() {
       });
       const data = await res.json();
       if (data.audioUrl) {
+        setActualAudioCost(prev => prev + (sceneItems[idx].text?.length || 0) * 0.05);
         setSceneItems(prev => {
           const updated = [...prev];
           updated[idx] = {
@@ -2729,14 +2511,26 @@ export default function Home() {
                 {scrapedPost.images && scrapedPost.images.length > 0 ? (
                   <div className="flex gap-3 overflow-x-auto pb-2 custom-scrollbar">
                     {scrapedPost.images.map((img, i) => (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img
-                        key={i}
-                        src={img}
-                        onClick={() => setPreviewImage(img)}
-                        className="h-24 w-auto rounded-lg border border-white/10 object-cover cursor-pointer hover:opacity-80 hover:scale-105 transition-all"
-                        alt="scraped content"
-                      />
+                      <div key={i} className="relative flex-shrink-0 group">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={img}
+                          onClick={() => setPreviewImage(img)}
+                          className="h-24 w-auto rounded-lg border border-white/10 object-cover cursor-pointer hover:opacity-80 hover:scale-105 transition-all"
+                          alt="scraped content"
+                        />
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setScrapedPost(prev => prev ? ({
+                              ...prev,
+                              images: prev.images.filter((_, idx) => idx !== i)
+                            }) : null);
+                          }}
+                          className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-600 hover:bg-red-500 text-white rounded-full flex items-center justify-center text-xs font-bold opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                          title="Remove from analysis"
+                        >×</button>
+                      </div>
                     ))}
                   </div>
                 ) : <span className="text-gray-500 text-xs italic">No images found</span>}
@@ -3325,8 +3119,8 @@ export default function Home() {
                     <Upload className="w-3 h-3" /> Bulk Upload
                   </button>
                   <div className="text-right mr-2">
-                    <span className="block text-[10px] text-gray-500 font-bold">EST. COST</span>
-                    <span className="block text-xs text-purple-300 font-mono">₩{(sceneItems.filter(s => s.isEnabled !== false).length * 58).toLocaleString()}</span>
+                    <span className="block text-[10px] text-gray-500 font-bold">ACTUAL COST</span>
+                    <span className="block text-xs text-purple-300 font-mono">₩{Math.round(actualImageCost).toLocaleString()}</span>
                   </div>
                   <button
                     onClick={handleGenerateAllImages}
@@ -3937,12 +3731,12 @@ export default function Home() {
                     <VideoIcon className="w-5 h-5" /> Download
                   </a>
                   <button
-                    onClick={() => setShowSaveOptions(true)}
+                    onClick={() => handleSaveProject(false)}
                     disabled={isSaving}
                     className="px-8 py-3 bg-gradient-to-r from-blue-600 to-cyan-500 hover:from-blue-500 hover:to-cyan-400 text-white font-bold rounded-full shadow-lg shadow-blue-900/30 transition-transform hover:scale-105 flex items-center gap-2"
                   >
                     {isSaving ? <Loader2 className="w-5 h-5 animate-spin" /> : <Save className="w-5 h-5" />}
-                    Save to Server
+                    Save to Gallery
                   </button>
                 </div>
               </div>
@@ -3952,463 +3746,55 @@ export default function Home() {
       }
 
       {/* Server Project Gallery Modal */}
-      {
-        showServerGallery && (
-          <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-8">
-            <div className="bg-[#1a1a1a] border border-white/10 rounded-3xl w-full max-w-6xl h-[85vh] shadow-2xl animate-in zoom-in duration-200 flex flex-col overflow-hidden">
-              {/* Header */}
-              <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
-                <h3 className="text-2xl font-bold flex items-center gap-3 text-white">
-                  <Film className="w-6 h-6 text-pink-400" /> Project Gallery
-                </h3>
-                <button
-                  onClick={() => setShowServerGallery(false)}
-                  className="p-2 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Gallery Grid */}
-              <div className="flex-1 overflow-y-auto p-8 bg-black/20">
-                {serverVideos.length === 0 ? (
-                  <div className="h-full flex flex-col items-center justify-center text-gray-500 gap-4">
-                    <Film className="w-16 h-16 opacity-20" />
-                    <p className="text-lg">No saved projects yet.</p>
-                  </div>
-                ) : (
-                  <>
-                    {/* Back Button for Hierarchy */}
-                    {expandedProjectTitle && (
-                      <button
-                        onClick={() => setExpandedProjectTitle(null)}
-                        className="mb-6 flex items-center gap-2 text-gray-400 hover:text-white transition-colors"
-                      >
-                        <RotateCcw className="w-4 h-4" /> Back to Project List
-                      </button>
-                    )}
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                      {(() => {
-                        // Grouping Logic
-                        const grouped = serverVideos.reduce((acc, curr) => {
-                          // Use groupTitle if available, otherwise try to extract base title from title, or fallback to title
-                          let key = curr.groupTitle;
-                          if (!key && curr.title) {
-                            // Attempt to strip " - N" suffix to group variations
-                            key = curr.title.replace(/ - \d+$/, "").trim();
-                          }
-                          key = key || "Untitled Project";
-
-                          if (!acc[key]) acc[key] = [];
-                          acc[key].push(curr);
-                          return acc;
-                        }, {} as Record<string, any[]>);
-
-                        // If expanded, show only videos in that group
-                        if (expandedProjectTitle) {
-                          const videos = grouped[expandedProjectTitle] || [];
-                          return videos.map((proj: any) => (
-                            <div key={proj.id} className="group bg-white/5 border border-white/5 rounded-2xl overflow-hidden hover:border-pink-500/50 hover:shadow-2xl hover:shadow-pink-900/20 transition-all duration-300 flex flex-col">
-                              {/* Video Preview */}
-                              <div
-                                className="aspect-video bg-black relative cursor-pointer"
-                                onClick={() => setSelectedProject(proj)}
-                              >
-                                {proj.thumbnailPath ? (
-                                  <img
-                                    src={proj.thumbnailPath}
-                                    className="w-full h-full object-cover"
-                                    alt={proj.title}
-                                  />
-                                ) : (
-                                  <video
-                                    src={proj.videoPath}
-                                    className="w-full h-full object-cover"
-                                    controls={false}
-                                    muted
-                                  />
-                                )}
-
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
-                                  <Play className="w-12 h-12 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
-                                </div>
-                                <div className="absolute top-2 left-2 bg-black/60 backdrop-blur px-2 py-1 rounded text-[10px] font-mono text-white/70">
-                                  ID: {proj.id.slice(0, 8)}
-                                </div>
-                              </div>
-
-
-                              {/* Info */}
-                              <div className="p-5 space-y-3 flex-1 flex flex-col">
-                                {editingProjectId === proj.id ? (
-                                  <div className="flex gap-2 items-center">
-                                    <input
-                                      type="text"
-                                      value={editTitleValue}
-                                      onChange={(e) => setEditTitleValue(e.target.value)}
-                                      className="flex-1 bg-black/30 border border-blue-500 rounded px-2 py-1 text-sm text-white focus:outline-none"
-                                      autoFocus
-                                    />
-                                    <button onClick={() => handleUpdateProjectTitle(proj.id, editTitleValue)} className="text-green-400 hover:text-green-300"><CheckCircle className="w-4 h-4" /></button>
-                                    <button onClick={() => setEditingProjectId(null)} className="text-red-400 hover:text-red-300"><X className="w-4 h-4" /></button>
-                                  </div>
-                                ) : (
-                                  <div className="flex justify-between items-start gap-2">
-                                    <h4 className="font-bold text-lg text-white group-hover:text-pink-400 transition-colors line-clamp-1 break-all" title={proj.title}>
-                                      {proj.title}
-                                    </h4>
-                                    <button
-                                      onClick={() => { setEditingProjectId(proj.id); setEditTitleValue(proj.title); }}
-                                      className="text-gray-500 hover:text-white transition-colors p-1"
-                                    >
-                                      <Pencil className="w-3 h-3" />
-                                    </button>
-                                  </div>
-                                )}
-
-                                <div className="space-y-1">
-                                  <div className="flex items-center gap-4 text-xs text-gray-400">
-                                    <span className="flex items-center gap-1"><Calendar className="w-3 h-3" /> {new Date(proj.createdAt || 0).toLocaleDateString()} {new Date(proj.createdAt || 0).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {Math.round(proj.duration || 0)}s</span>
-                                  </div>
-
-                                  {proj.usage && (
-                                    <div className="text-[10px] text-gray-500 bg-black/20 p-2 rounded mt-1 border border-white/5 space-y-0.5">
-                                      <div className="flex justify-between font-mono text-green-400 font-bold border-b border-white/5 pb-0.5 mb-0.5">
-                                        <span>TOTAL</span>
-                                        <span>₩{Math.round(proj.usage.totalCost || 0).toLocaleString()}</span>
-                                      </div>
-                                      <div className="flex justify-between"><span>Script</span><span>₩{Math.round(proj.usage.scriptCost || 0)}</span></div>
-                                      <div className="flex justify-between"><span>Image</span><span>₩{Math.round(proj.usage.imageCost || 0)}</span></div>
-                                      <div className="flex justify-between"><span>Audio</span><span>₩{Math.round(proj.usage.audioCost || 0)}</span></div>
-                                    </div>
-                                  )}
-                                </div>
-
-                                <div className="pt-3 flex gap-2 mt-auto">
-                                  <a
-                                    href={proj.videoPath}
-                                    download={`${proj.title || "project"}.webm`}
-                                    className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-center text-xs font-bold text-white transition-colors flex items-center justify-center gap-1"
-                                  >
-                                    <VideoIcon className="w-3 h-3" /> Download
-                                  </a>
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setSelectedProject(proj); // Select the project
-                                      setShowSNSModal(true); // Open Modal
-                                    }}
-                                    className="px-3 py-2 bg-red-600/10 hover:bg-red-600/20 text-red-400 rounded-lg transition-colors border border-red-600/20 flex items-center justify-center"
-                                    title="Upload to YouTube"
-                                  >
-                                    <Upload className="w-3 h-3" />
-                                  </button>
-                                  <button
-                                    onClick={(e) => handleDeleteProject(proj.id, e)}
-                                    className="px-3 py-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-colors border border-red-500/20 shadow-none hover:shadow-red-500/20"
-                                    title="Delete Project"
-                                  >
-                                    <Trash2 className="w-4 h-4" />
-                                  </button>
-                                </div>
-                              </div>
-                            </div>
-                          ));
-                        } else {
-                          // Folder View (Grouped)
-                          return Object.entries(grouped).map(([title, items]) => {
-                            const itemList = items as any[];
-                            return (
-                              <div
-                                key={title}
-                                onClick={() => setExpandedProjectTitle(title)}
-                                className="group bg-white/5 border border-white/5 rounded-2xl p-6 hover:border-blue-500/50 hover:shadow-2xl hover:shadow-blue-900/10 transition-all duration-300 cursor-pointer flex flex-col gap-4 relative overflow-hidden"
-                              >
-                                <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                                  <FileVideo className="w-32 h-32 text-blue-500" />
-                                </div>
-
-                                <div className="flex items-center gap-3">
-                                  <div className="w-12 h-12 bg-blue-500/20 rounded-xl flex items-center justify-center text-blue-400 group-hover:scale-110 transition-transform">
-                                    <Film className="w-6 h-6" />
-                                  </div>
-                                  <div>
-                                    <h4 className="font-bold text-lg text-white group-hover:text-blue-400 transition-colors line-clamp-1" title={title}>
-                                      {title}
-                                    </h4>
-                                    <p className="text-sm text-gray-500">{itemList.length} Video{itemList.length !== 1 && 's'}</p>
-                                  </div>
-                                </div>
-
-                                <div className="mt-auto space-y-3">
-                                  <div className="flex justify-between items-end">
-                                    <div className="flex -space-x-2 overflow-hidden">
-                                      {itemList.slice(0, 4).map((item, i) => (
-                                        <div
-                                          key={i}
-                                          className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-gray-800 bg-cover bg-center shadow-lg"
-                                          style={{ backgroundImage: item.thumbnailPath ? `url('${item.thumbnailPath}')` : `none` }}
-                                        >
-                                          {!item.thumbnailPath && (
-                                            <div className="w-full h-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center text-[10px] font-bold text-white">
-                                              {i + 1}
-                                            </div>
-                                          )}
-                                        </div>
-                                      ))}
-                                      {itemList.length > 4 && (
-                                        <div className="w-10 h-10 rounded-full border-2 border-[#1a1a1a] bg-gray-700 flex items-center justify-center text-xs font-bold text-gray-300 shadow-lg">
-                                          +{itemList.length - 4}
-                                        </div>
-                                      )}
-                                    </div>
-                                    <div className="text-right">
-                                      <div className="text-[10px] text-gray-500 font-bold uppercase tracking-wider mb-1">Total Stats</div>
-                                      <div className="text-xs text-green-400 font-mono font-bold">
-                                        ₩{Math.round(itemList.reduce((sum, it) => sum + (it.usage?.totalCost || 0), 0)).toLocaleString()}
-                                      </div>
-                                      <div className="text-[10px] text-gray-400">
-                                        {Math.round(itemList.reduce((sum, it) => sum + (it.duration || 0), 0))}s total
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="text-[10px] text-gray-600 border-t border-white/5 pt-2 flex justify-between items-center">
-                                    <span>Active Project</span>
-                                    <span>Last: {new Date(Math.max(...itemList.map(i => new Date(i.createdAt || 0).getTime()))).toLocaleDateString()}</span>
-                                  </div>
-                                </div>
-                              </div>
-                            );
-                          });
-                        }
-                      })()}
-                    </div>
-                  </>
-                )}
-              </div>
-
-              {/* Footer */}
-              <div className="p-4 border-t border-white/5 bg-black/40 text-center">
-                <p className="text-xs text-gray-600">Videos are stored locally in the 'public/projects' directory.</p>
-              </div>
-            </div>
-          </div>
-        )
-      }
-
-      {/* Gallery Video Player Modal */}
-      {
-        selectedProject && (
-          <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
-            <div className="bg-[#111] border border-white/10 rounded-3xl w-full max-w-7xl h-full max-h-[90vh] flex flex-col md:flex-row overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]">
-
-              {/* Video Area */}
-              <div className="flex-[2] bg-black relative flex items-center justify-center group/player">
-                <video
-                  src={selectedProject.videoPath}
-                  className="w-full h-full object-contain"
-                  controls
-                  autoPlay
-                />
-                <button
-                  onClick={() => setSelectedProject(null)}
-                  className="absolute top-6 left-6 z-50 p-3 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all border border-white/10 hover:scale-110 md:hidden"
-                >
-                  <X className="w-6 h-6" />
-                </button>
-              </div>
-
-              {/* Info Panel */}
-              <div className="flex-1 border-l border-white/10 flex flex-col bg-[#161616]">
-                <div className="p-8 flex-1 overflow-y-auto space-y-8">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <div className="text-[10px] font-bold text-pink-500 uppercase tracking-widest mb-2 bg-pink-500/10 w-fit px-2 py-0.5 rounded">Project Details</div>
-                      <h3 className="text-3xl font-bold text-white leading-tight">{selectedProject.title}</h3>
-                      <p className="text-sm text-gray-500 mt-2 font-mono flex items-center gap-2">
-                        <Clock className="w-4 h-4" /> {new Date(selectedProject.createdAt).toLocaleString()}
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setSelectedProject(null)}
-                      className="p-2 hover:bg-white/5 rounded-full text-gray-400 hover:text-white transition-colors hidden md:block"
-                    >
-                      <X className="w-6 h-6" />
-                    </button>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Duration</p>
-                      <p className="text-xl font-bold text-white">{Math.round(selectedProject.duration || 0)}s</p>
-                    </div>
-                    <div className="bg-white/5 p-4 rounded-2xl border border-white/5">
-                      <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">Format</p>
-                      <p className="text-xl font-bold text-white uppercase">{selectedProject.videoPath?.split('.').pop() || 'WEBM'}</p>
-                    </div>
-                  </div>
-
-                  {selectedProject.usage && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Cost Breakdown</h4>
-                        <div className="flex-1 h-px bg-white/5"></div>
-                      </div>
-                      <div className="space-y-3 bg-black/20 p-5 rounded-2xl border border-white/5">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 flex items-center gap-2"><FileText className="w-4 h-4" /> Script / AI</span>
-                          <span className="text-white font-mono font-bold">₩{Math.round(selectedProject.usage.scriptCost || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 flex items-center gap-2"><ImageIcon className="w-4 h-4" /> Visual Assets</span>
-                          <span className="text-white font-mono font-bold">₩{Math.round(selectedProject.usage.imageCost || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="text-gray-400 flex items-center gap-2"><Music className="w-4 h-4" /> Audio Narration</span>
-                          <span className="text-white font-mono font-bold">₩{Math.round(selectedProject.usage.audioCost || 0).toLocaleString()}</span>
-                        </div>
-                        <div className="pt-3 mt-3 border-t border-white/10 flex justify-between items-center">
-                          <span className="text-pink-400 font-bold">TOTAL ESTIMATED</span>
-                          <span className="text-2xl font-bold text-green-400 font-mono">
-                            ₩{Math.round(selectedProject.usage.totalCost || 0).toLocaleString()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Tags or Meta */}
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                      <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Storage Info</h4>
-                      <div className="flex-1 h-px bg-white/5"></div>
-                    </div>
-                    <div className="text-[10px] text-gray-600 break-all font-mono bg-black/40 p-3 rounded-lg border border-white/5">
-                      Path: {selectedProject.videoPath}
-                    </div>
-                  </div>
-
-                  {/* Original Assets (Relocated) */}
-                  {selectedProject.scenes && selectedProject.scenes.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Original Assets</h4>
-                        <div className="flex-1 h-px bg-white/5"></div>
-                      </div>
-                      <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
-                        {selectedProject.scenes.map((scene: any, idx: number) => {
-                          if (!scene.imageUrl) return null;
-                          return (
-                            <div
-                              key={idx}
-                              className="group relative aspect-video bg-black/50 rounded-lg overflow-hidden border border-white/5 hover:border-pink-500/50 transition-all cursor-pointer hover:shadow-lg hover:shadow-pink-500/10"
-                              onClick={() => setPreviewImage(scene.imageUrl)}
-                            >
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={scene.imageUrl}
-                                alt={`Scene ${idx + 1}`}
-                                className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity"
-                              />
-                              <div className="absolute top-1 left-1 bg-black/60 px-1 py-0.5 rounded text-[9px] font-bold text-white/90">
-                                #{idx + 1}
-                              </div>
-                              <div className="absolute inset-0 bg-black/0 group-hover:bg-white/10 transition-colors pointer-events-none" />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Actions */}
-                <div className="p-8 bg-black/20 border-t border-white/10">
-                  <div className="grid grid-cols-3 gap-4 mb-8">
-                    <a
-                      href={selectedProject.videoPath}
-                      download={`${selectedProject.title || "video"}.webm`}
-                      className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-center font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5"
-                    >
-                      <VideoIcon className="w-4 h-4" /> Download Video
-                    </a>
-                    <button
-                      onClick={() => setShowSNSModal(true)}
-                      className="py-3 bg-red-600/80 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 shadow-lg shadow-red-900/20"
-                    >
-                      <Upload className="w-4 h-4" /> Upload to YouTube
-                    </button>
-                    <button
-                      onClick={() => {
-                        if (selectedProject.scenes) {
-                          setSceneItems(selectedProject.scenes);
-                          setProjectTitle(selectedProject.title || "");
-                          setShowServerGallery(false);
-                          setSelectedProject(null);
-                          setAnalysisResult({
-                            summary: selectedProject.title,
-                            scenes: [],
-                            imageAnalysis: { summary: "Loaded from gallery", visualStyle: "Auto", dominantColors: [] },
-                            consistency: { character: "Loaded", theme: "Loaded" },
-                            suggestedStyles: []
-                          });
-                          alert("Project items loaded for editing!");
-                        } else {
-                          alert("This project was saved without scene data and cannot be re-edited.");
-                        }
-                      }}
-                      className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
-                    >
-                      <Pencil className="w-4 h-4" /> Re-edit
-                    </button>
-                  </div>
-
-                  {/* Upload History */}
-                  {selectedProject.uploads && selectedProject.uploads.length > 0 && (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2">
-                        <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">YouTube Upload History</h4>
-                        <div className="flex-1 h-px bg-white/5"></div>
-                      </div>
-                      <div className="bg-white/5 rounded-xl overflow-hidden border border-white/5 divide-y divide-white/5 max-h-60 overflow-y-auto custom-scrollbar">
-                        {selectedProject.uploads.map((upload: any, idx: number) => (
-                          <div key={idx} className="p-4 flex items-center justify-between hover:bg-white/5 transition-colors">
-                            <div className="flex items-center gap-4">
-                              <div className="w-10 h-10 rounded-full bg-red-600/20 flex items-center justify-center text-red-500">
-                                <VideoIcon className="w-5 h-5" />
-                              </div>
-                              <div>
-                                <div className="text-sm font-bold text-white">Uploaded to YouTube</div>
-                                <div className="text-xs text-gray-500 flex items-center gap-2">
-                                  <span>{new Date(upload.timestamp).toLocaleString()}</span>
-                                  {upload.channelId && <span className="px-1.5 py-0.5 rounded bg-white/10 text-gray-400">{upload.channelId}</span>}
-                                </div>
-                              </div>
-                            </div>
-                            <a
-                              href={`https://youtu.be/${upload.videoId}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="px-4 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-xs font-bold text-white transition-colors flex items-center gap-2"
-                            >
-                              Watch <ChevronRight className="w-3 h-3" />
-                            </a>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-
-              </div>
-            </div>
-          </div>
-        )
-      }
-
+      <ProjectGallery
+        showServerGallery={showServerGallery}
+        setShowServerGallery={setShowServerGallery}
+        serverVideos={serverVideos}
+        expandedProjectTitle={expandedProjectTitle}
+        setExpandedProjectTitle={setExpandedProjectTitle}
+        selectedProject={selectedProject}
+        setSelectedProject={setSelectedProject}
+        editingProjectId={editingProjectId}
+        setEditingProjectId={setEditingProjectId}
+        editTitleValue={editTitleValue}
+        setEditTitleValue={setEditTitleValue}
+        handleUpdateProjectTitle={handleUpdateProjectTitle}
+        handleDeleteProject={handleDeleteProject}
+        setShowSNSModal={setShowSNSModal}
+        setPreviewImage={setPreviewImage}
+        onLoadForEditing={async (proj: any) => {
+          let scenes = proj.scenes;
+          if (!scenes || scenes.length === 0) {
+            const fetchId = proj.projectId || proj.id;
+            try {
+              const fsRes = await fetch(`/api/projects/list?id=${fetchId}`);
+              if (fsRes.ok) {
+                const fsData = await fsRes.json();
+                scenes = fsData.scenes || [];
+              }
+            } catch (e) {
+              console.warn("Failed to fetch scenes from FS", e);
+            }
+          }
+          if (scenes && scenes.length > 0) {
+            setSceneItems(scenes);
+            setProjectTitle(proj.title || "");
+            setShowServerGallery(false);
+            setSelectedProject(null);
+            setCurrentGalleryId(proj.id);
+            setAnalysisResult({
+              summary: proj.title,
+              scenes: [],
+              imageAnalysis: { summary: "Loaded from gallery", visualStyle: "Auto", dominantColors: [] },
+              consistency: { character: "Loaded", theme: "Loaded" },
+              suggestedStyles: []
+            });
+            alert("Project items loaded for editing!");
+          } else {
+            alert("This project was saved without scene data and cannot be re-edited.");
+          }
+        }}
+      />
       {/* Project List Modal */}
       {
         showProjectList && (
@@ -5461,9 +4847,9 @@ export default function Home() {
                               className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-purple-500 transition-colors"
                               style={{ fontFamily: subtitleFont }}
                             >
-                              {fontOptions.map(f => (
+                              {FONT_OPTIONS.map(f => (
                                 <option key={f} value={f} style={{ fontFamily: f }}>
-                                  {fontDisplayMap[f] || f}
+                                  {FONT_DISPLAY_MAP[f] || f}
                                 </option>
                               ))}
                             </select>
@@ -5715,9 +5101,9 @@ export default function Home() {
                                 className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-blue-500 transition-colors"
                                 style={{ fontFamily: narrationFont }}
                               >
-                                {fontOptions.map(f => (
+                                {FONT_OPTIONS.map(f => (
                                   <option key={f} value={f} style={{ fontFamily: f }}>
-                                    {fontDisplayMap[f] || f}
+                                    {FONT_DISPLAY_MAP[f] || f}
                                   </option>
                                 ))}
                               </select>
@@ -5860,8 +5246,8 @@ export default function Home() {
                                       className="w-full bg-black/40 border border-white/10 rounded px-2 py-1.5 text-xs text-white outline-none focus:border-orange-500"
                                       style={{ fontFamily: captionConfig.dynamicStyle.fontFamily }}
                                     >
-                                      {fontOptions.map(f => (
-                                        <option key={f} value={f} style={{ fontFamily: f }}>{fontDisplayMap[f] || f}</option>
+                                      {FONT_OPTIONS.map(f => (
+                                        <option key={f} value={f} style={{ fontFamily: f }}>{FONT_DISPLAY_MAP[f] || f}</option>
                                       ))}
                                     </select>
 
@@ -6006,31 +5392,41 @@ export default function Home() {
                 </div>
               </div>
 
-              <div className="p-6 border-t border-white/10 flex justify-end gap-4 bg-white/5">
-                <button
-                  onClick={() => setShowRenderSettings(false)}
-                  className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    if (currentProjectId) {
-                      try {
-                        // Auto-save settings before rendering using Update Mode
-                        await handleSaveProject(true);
-                      } catch (e) {
-                        console.error("Auto-save failed before render", e);
+              <div className="p-6 border-t border-white/10 flex items-center justify-between bg-white/5">
+                <label className="flex items-center gap-2 cursor-pointer select-none group">
+                  <input
+                    type="checkbox"
+                    checked={autoSaveOnRender}
+                    onChange={(e) => setAutoSaveOnRender(e.target.checked)}
+                    className="w-4 h-4 rounded border-white/20 bg-black/40 text-purple-500 focus:ring-purple-500 focus:ring-offset-0 cursor-pointer accent-purple-500"
+                  />
+                  <span className="text-sm text-gray-400 group-hover:text-gray-200 transition-colors">Auto Save</span>
+                </label>
+                <div className="flex gap-4">
+                  <button
+                    onClick={() => setShowRenderSettings(false)}
+                    className="px-6 py-3 rounded-xl font-bold text-gray-400 hover:text-white hover:bg-white/5 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={async () => {
+                      if (autoSaveOnRender && currentProjectId) {
+                        try {
+                          await handleSaveProject(true);
+                        } catch (e) {
+                          console.error("Auto-save failed before render", e);
+                        }
                       }
-                    }
-                    setRenderLogs([]);
-                    handleConfirmRender();
-                  }}
-                  className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
-                >
-                  <VideoIcon className="w-5 h-5" />
-                  Start Rendering
-                </button>
+                      setRenderLogs([]);
+                      handleConfirmRender();
+                    }}
+                    className="px-8 py-3 bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white font-bold rounded-xl shadow-lg transition-transform hover:scale-105 flex items-center gap-2"
+                  >
+                    <VideoIcon className="w-5 h-5" />
+                    Start Rendering
+                  </button>
+                </div>
               </div>
             </div>
           </div >
@@ -6285,7 +5681,7 @@ export default function Home() {
         showSNSModal && (currentProjectId || selectedProject) && (
           <SNSUploadModal
             project={selectedProject ? {
-              id: selectedProject.id,
+              id: selectedProject.projectId || selectedProject.id,
               title: selectedProject.title,
               videoPath: selectedProject.videoPath,
               description: selectedProject.description
@@ -6303,12 +5699,16 @@ export default function Home() {
               await fetchServerProjects();
 
               // 2. If viewing details (Gallery), refresh that specific project to see new history
-              if (selectedProject) {
+              if (selectedProject?.projectId) {
                 try {
-                  const res = await fetch(`/api/projects?id=${selectedProject.id}`);
+                  const res = await fetch(`/api/projects?id=${selectedProject.projectId}`);
                   const data = await res.json();
-                  // Ensure we preserve any local view state if needed, but data has the fresh uploads
-                  setSelectedProject(data);
+                  // Merge: preserve gallery data (videoPath etc) + update uploads from Projects
+                  setSelectedProject((prev: any) => ({
+                    ...prev,
+                    uploads: data.uploads || prev?.uploads,
+                    scenes: data.scenes || prev?.scenes,
+                  }));
                 } catch (e) {
                   console.error("Failed to refresh project details", e);
                 }
@@ -6323,145 +5723,151 @@ export default function Home() {
         )
       }
       {/* Template Load Dialog */}
-      {templateLoadDialog && savedTemplates[templateLoadDialog.idx] && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-white/5 bg-white/5">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <LayoutTemplate className="w-5 h-5 text-purple-400" />
-                템플릿 불러오기
-              </h3>
-              <p className="text-xs text-gray-400 mt-1">
-                &quot;{savedTemplates[templateLoadDialog.idx].name}&quot; — {savedTemplates[templateLoadDialog.idx].scenes.length}개 씬
-                {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 &&
-                  ` (${savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개 이미지 포함)`}
-              </p>
-            </div>
-            <div className="p-5 space-y-3">
-              <p className="text-xs text-gray-500 mb-3">현재 씬이 템플릿으로 교체됩니다.</p>
-              <button
-                onClick={() => handleLoadTemplate(templateLoadDialog.idx, true)}
-                className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <ImageIcon className="w-4 h-4" /> 이미지 포함하여 불러오기
-                {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 && (
-                  <span className="text-[10px] opacity-70 font-normal">({savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개)</span>
-                )}
-              </button>
-              <button
-                onClick={() => handleLoadTemplate(templateLoadDialog.idx, false)}
-                className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <FileText className="w-4 h-4" /> 텍스트만 불러오기
-              </button>
-              <button
-                onClick={() => setTemplateLoadDialog(null)}
-                className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
-              >
-                취소
-              </button>
+      {
+        templateLoadDialog && savedTemplates[templateLoadDialog.idx] && (
+          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-white/5 bg-white/5">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <LayoutTemplate className="w-5 h-5 text-purple-400" />
+                  템플릿 불러오기
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  &quot;{savedTemplates[templateLoadDialog.idx].name}&quot; — {savedTemplates[templateLoadDialog.idx].scenes.length}개 씬
+                  {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 &&
+                    ` (${savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개 이미지 포함)`}
+                </p>
+              </div>
+              <div className="p-5 space-y-3">
+                <p className="text-xs text-gray-500 mb-3">현재 씬이 템플릿으로 교체됩니다.</p>
+                <button
+                  onClick={() => handleLoadTemplate(templateLoadDialog.idx, true)}
+                  className="w-full py-3 px-4 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <ImageIcon className="w-4 h-4" /> 이미지 포함하여 불러오기
+                  {savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length > 0 && (
+                    <span className="text-[10px] opacity-70 font-normal">({savedTemplates[templateLoadDialog.idx].scenes.filter(s => s.imageUrl).length}개)</span>
+                  )}
+                </button>
+                <button
+                  onClick={() => handleLoadTemplate(templateLoadDialog.idx, false)}
+                  className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <FileText className="w-4 h-4" /> 텍스트만 불러오기
+                </button>
+                <button
+                  onClick={() => setTemplateLoadDialog(null)}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Bulk Upload Mode Dialog */}
-      {bulkUploadDialog && (
-        <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
-            <div className="p-5 border-b border-white/5 bg-white/5">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Upload className="w-5 h-5 text-blue-400" />
-                이미지 일괄 업로드
-              </h3>
-              <p className="text-xs text-gray-400 mt-1">
-                {bulkUploadDialog.files.length}개 이미지가 선택되었습니다
-              </p>
-            </div>
-            <div className="p-5 space-y-3">
-              <button
-                onClick={() => {
-                  const { files } = bulkUploadDialog;
-                  setSceneItems(prev => {
-                    const updated = [...prev];
-                    files.forEach((file, i) => {
-                      if (i < updated.length) {
-                        const url = URL.createObjectURL(file);
-                        updated[i] = { ...updated[i], imageUrl: url, status: 'approved' as any };
-                      }
+      {
+        bulkUploadDialog && (
+          <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-200">
+            <div className="bg-[#1a1a1a] border border-white/10 rounded-2xl w-full max-w-sm shadow-2xl overflow-hidden">
+              <div className="p-5 border-b border-white/5 bg-white/5">
+                <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                  <Upload className="w-5 h-5 text-blue-400" />
+                  이미지 일괄 업로드
+                </h3>
+                <p className="text-xs text-gray-400 mt-1">
+                  {bulkUploadDialog.files.length}개 이미지가 선택되었습니다
+                </p>
+              </div>
+              <div className="p-5 space-y-3">
+                <button
+                  onClick={() => {
+                    const { files } = bulkUploadDialog;
+                    setSceneItems(prev => {
+                      const updated = [...prev];
+                      files.forEach((file, i) => {
+                        if (i < updated.length) {
+                          const url = URL.createObjectURL(file);
+                          updated[i] = { ...updated[i], imageUrl: url, status: 'approved' as any };
+                        }
+                      });
+                      return updated;
                     });
-                    return updated;
-                  });
-                  setBulkUploadDialog(null);
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <Pencil className="w-4 h-4" /> 기존 씬 이미지 교체
-                <span className="text-[10px] opacity-70 font-normal">(씬 1~{Math.min(bulkUploadDialog.files.length, sceneItems.length)})</span>
-              </button>
-              <button
-                onClick={() => {
-                  const { files } = bulkUploadDialog;
-                  setSceneItems(prev => {
-                    const newScenes: SceneItem[] = files.map((file, i) => ({
-                      text: '',
-                      subtitle: '',
-                      title: `Scene ${prev.length + i + 1}`,
-                      imageUrl: URL.createObjectURL(file),
-                      imagePrompt: '',
-                      status: 'approved' as any,
-                      duration: 8,
-                      transition: 'fade' as any,
-                      audioUrl: null,
-                      audioDuration: 0,
-                      isEnabled: true,
-                      isAudioGenerating: false,
-                    }));
-                    return [...prev, ...newScenes];
-                  });
-                  setBulkUploadDialog(null);
-                }}
-                className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
-              >
-                <Plus className="w-4 h-4" /> 새로운 빈 씬 추가
-                <span className="text-[10px] opacity-70 font-normal">(+{bulkUploadDialog.files.length}개)</span>
-              </button>
-              <button
-                onClick={() => setBulkUploadDialog(null)}
-                className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
-              >
-                취소
-              </button>
+                    setBulkUploadDialog(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Pencil className="w-4 h-4" /> 기존 씬 이미지 교체
+                  <span className="text-[10px] opacity-70 font-normal">(씬 1~{Math.min(bulkUploadDialog.files.length, sceneItems.length)})</span>
+                </button>
+                <button
+                  onClick={() => {
+                    const { files } = bulkUploadDialog;
+                    setSceneItems(prev => {
+                      const newScenes: SceneItem[] = files.map((file, i) => ({
+                        text: '',
+                        subtitle: '',
+                        title: `Scene ${prev.length + i + 1}`,
+                        imageUrl: URL.createObjectURL(file),
+                        imagePrompt: '',
+                        status: 'approved' as any,
+                        duration: 8,
+                        transition: 'fade' as any,
+                        audioUrl: null,
+                        audioDuration: 0,
+                        isEnabled: true,
+                        isAudioGenerating: false,
+                      }));
+                      return [...prev, ...newScenes];
+                    });
+                    setBulkUploadDialog(null);
+                  }}
+                  className="w-full py-3 px-4 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-bold flex items-center justify-center gap-2 transition-colors"
+                >
+                  <Plus className="w-4 h-4" /> 새로운 빈 씬 추가
+                  <span className="text-[10px] opacity-70 font-normal">(+{bulkUploadDialog.files.length}개)</span>
+                </button>
+                <button
+                  onClick={() => setBulkUploadDialog(null)}
+                  className="w-full py-2 text-sm text-gray-500 hover:text-white transition-colors"
+                >
+                  취소
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
 
       {/* Image Crop Modal */}
-      {cropModal?.isOpen && (
-        <ImageCropModal
-          imageUrl={cropModal.imageUrl}
-          targetWidth={cropModal.targetW}
-          targetHeight={cropModal.targetH}
-          onConfirm={(croppedUrl) => {
-            setSceneItems(prev => {
-              const updated = [...prev];
-              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: croppedUrl, status: 'approved' as any };
-              return updated;
-            });
-            setCropModal(null);
-          }}
-          onUseOriginal={() => {
-            setSceneItems(prev => {
-              const updated = [...prev];
-              updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: cropModal.imageUrl, status: 'approved' as any };
-              return updated;
-            });
-            setCropModal(null);
-          }}
-          onClose={() => setCropModal(null)}
-        />
-      )}
+      {
+        cropModal?.isOpen && (
+          <ImageCropModal
+            imageUrl={cropModal.imageUrl}
+            targetWidth={cropModal.targetW}
+            targetHeight={cropModal.targetH}
+            onConfirm={(croppedUrl) => {
+              setSceneItems(prev => {
+                const updated = [...prev];
+                updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: croppedUrl, status: 'approved' as any };
+                return updated;
+              });
+              setCropModal(null);
+            }}
+            onUseOriginal={() => {
+              setSceneItems(prev => {
+                const updated = [...prev];
+                updated[cropModal.sceneIndex] = { ...updated[cropModal.sceneIndex], imageUrl: cropModal.imageUrl, status: 'approved' as any };
+                return updated;
+              });
+              setCropModal(null);
+            }}
+            onClose={() => setCropModal(null)}
+          />
+        )
+      }
     </main >
   );
 }

@@ -1,0 +1,88 @@
+{
+  "groupTitle": "설 명절 성수식품 등 합동점검 결과, 위반업체 158곳 적발·조치",
+  "title": "설 명절 성수식품 등 합동점검 결과, 위반업체 158곳 적발·조치 - 4",
+  "duration": 20.691875,
+  "usage": {
+    "scriptCost": 0,
+    "imageCost": 0,
+    "audioCost": 0,
+    "totalCost": 0
+  },
+  "scenes": [
+    {
+      "text": "우리는 오늘보다 더 나은 내일을 꿈꿉니다. 시민의 목소리를 경청하며 설계한 2030 미래 비전은 우리 도시의 새로운 이정표가 될 것입니다. 신뢰를 바탕으로 변화의 시작을 알립니다.",
+      "title": "미래 비전 선포",
+      "imagePrompt": "A 4k hyper-realistic cinematic wide shot of a professional woman in a neat suit standing on the right side, looking forward with a hopeful smile. The background is a minimalist, clean office with cool blue tones and professional photography lighting. On the left wide negative space, a sleek digital infographic panel displays the bold Korean text '미래 비전 2030' in white modern typography. Cinematic lighting, depth of field.",
+      "imageUrl": "/projects/recga1kHeNfEIJ3kO/images/img_1770787486178_kld0sj.jpg",
+      "status": "approved",
+      "subtitle": "미래 비전 2030: 새로운 시작",
+      "duration": 20,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770787786698.wav",
+      "audioDuration": 17.691875,
+      "isEnabled": true,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "지속 가능한 성장을 위해 친환경 에너지 전환을 가속화하겠습니다. 깨끗한 환경 속에서 우리 아이들이 마음껏 숨 쉴 수 있는 탄소 중립 도시를 구현하는 것이 우리의 첫 번째 약속입니다.",
+      "title": "친환경 에너지 정책",
+      "imagePrompt": "A 4k hyper-realistic wide shot of the same professional woman on the right. In the wide negative space on the left, an infographic chart displays icons of wind turbines and solar panels with bold Korean text '청정 에너지 전환'. Cool blue and teal tones, minimalist background, bright professional studio lighting, depth of field.",
+      "imageUrl": "/projects/recga1kHeNfEIJ3kO/images/img_1770787513071_5tejqa.jpg",
+      "status": "approved",
+      "subtitle": "청정 에너지 전환 및 탄소 중립",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770787801533.wav",
+      "audioDuration": 13.851875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "첨단 기술이 시민의 안전을 지킵니다. 스마트 인프라를 통해 교통 체증을 해소하고, 사각지대 없는 촘촘한 안전망을 구축하여 누구나 안심하고 살 수 있는 스마트 시티를 만들겠습니다.",
+      "title": "스마트 인프라 구축",
+      "imagePrompt": "A 4k hyper-realistic cinematic shot. The woman is on the right looking at a digital interface. The left space contains an infographic flow chart showing smart city connectivity with bold Korean text '디지털 시민 행정'. Cool blue tones, cinematic lighting, wide shot, professional photography, negative space for text overlay.",
+      "imageUrl": "/projects/recga1kHeNfEIJ3kO/images/img_1770787546004_l80bli.jpg",
+      "status": "approved",
+      "subtitle": "디지털 시민 행정 및 안전망",
+      "duration": 18,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770787816891.wav",
+      "audioDuration": 15.771875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "모두가 소외되지 않는 따뜻한 공동체를 지향합니다. 맞춤형 복지 시스템과 생애 주기별 지원 정책을 통해 시민 한 분 한 분의 삶의 질을 높이는 데 모든 역량을 집중하겠습니다.",
+      "title": "시민 행복 공동체",
+      "imagePrompt": "A 4k hyper-realistic wide shot with the woman on the right. The left negative space features a structured infographic with icons representing family and healthcare services, accompanied by bold Korean text '모두가 행복한 공동체'. Warm cinematic light accents, cool blue base tones, clean minimalist background.",
+      "imageUrl": "/projects/recga1kHeNfEIJ3kO/images/img_1770787571357_yqwn7v.jpg",
+      "status": "approved",
+      "subtitle": "모두가 행복한 복지 공동체",
+      "duration": 16,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770787831054.wav",
+      "audioDuration": 13.771875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    },
+    {
+      "text": "이 모든 약속은 단계별 로드맵에 따라 투명하게 추진됩니다. 2030년까지 이어질 구체적인 실행 계획을 통해 변화를 체감하실 수 있도록 정성을 다해 나아가겠습니다. 시민과 함께하겠습니다.",
+      "title": "2030 로드맵",
+      "imagePrompt": "A 4k hyper-realistic cinematic wide shot showing a professional timeline graphic on the left negative space. The timeline includes milestones in Korean characters. The woman is on the right, looking towards the graphic. Cool blue professional office lighting, minimalist background, depth of field, bold Korean text '2030 로드맵'.",
+      "imageUrl": "/projects/recga1kHeNfEIJ3kO/images/img_1770787595046_7oonue.jpg",
+      "status": "approved",
+      "subtitle": "변화를 향한 단계별 실행 계획",
+      "duration": 19,
+      "transition": "fade",
+      "audioUrl": "/generated/audio/narration_1770787848883.wav",
+      "audioDuration": 16.051875,
+      "isEnabled": false,
+      "isAudioGenerating": false
+    }
+  ],
+  "id": "e05df623-7d30-4412-a8e5-c0e2dfb449c9",
+  "createdAt": "2026-02-12T01:26:11.137Z",
+  "updatedAt": "2026-02-12T01:26:11.137Z",
+  "videoPath": "/projects/e05df623-7d30-4412-a8e5-c0e2dfb449c9/video_1770859571131.webm",
+  "thumbnailPath": "/projects/e05df623-7d30-4412-a8e5-c0e2dfb449c9/thumbnail_1770859571131.jpg"
+}

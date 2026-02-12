@@ -2,6 +2,29 @@
 import { NextResponse } from 'next/server';
 import * as cheerio from 'cheerio';
 
+// Helper: Use Puppeteer to render a JavaScript-heavy page and return its HTML
+async function renderWithPuppeteer(pageUrl: string): Promise<string> {
+    let puppeteer;
+    try {
+        puppeteer = await import('puppeteer');
+    } catch {
+        console.error('[Scraper] Puppeteer not available for dynamic rendering');
+        return '';
+    }
+    const browser = await puppeteer.default.launch({ headless: 'new' as unknown as boolean });
+    try {
+        const page = await browser.newPage();
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        await page.goto(pageUrl, { waitUntil: 'networkidle2', timeout: 30000 });
+        // Wait for dynamic content (dates in span.info or board list items)
+        await page.waitForSelector('span.info, .board_list li, #boardList li, .gallery_list li, .today_list li', { timeout: 10000 }).catch(() => { });
+        await new Promise(r => setTimeout(r, 2000));
+        return await page.content();
+    } finally {
+        await browser.close();
+    }
+}
+
 // Helper to parse date strings
 const parseDate = (dateStr: string) => {
     // Try to find YYYY-MM-DD or YYYY.MM.DD
@@ -169,6 +192,91 @@ export async function POST(request: Request) {
             }
         });
 
+        // ── Puppeteer Fallback: If static HTML found 0 posts, try rendering with JS ──
+        if (posts.length === 0) {
+            console.log('[Scraper] Static HTML returned 0 posts – attempting Puppeteer rendering...');
+            try {
+                const renderedHtml = await renderWithPuppeteer(url);
+                if (renderedHtml) {
+                    const $r = cheerio.load(renderedHtml);
+                    // Re-run date-based scanning on the rendered DOM
+                    $r('*').each((_, element) => {
+                        const text = $r(element).text().trim();
+                        const elementDate = parseDate(text);
+                        if (elementDate) {
+                            let parentRow = $r(element).closest('tr, li, div.list-item, div.cont_box, dl, a');
+                            if (parentRow.length > 0) {
+                                let bestLink: string | null = null;
+                                let bestTitle = "";
+                                let fallbackLink: string | null = null;
+
+                                let links = parentRow.find('a');
+                                if (links.length === 0) {
+                                    links = parentRow.parent().find('a');
+                                }
+
+                                links.each((_, l) => {
+                                    const lEl = $r(l);
+                                    const href = lEl.attr('href');
+                                    const txt = lEl.text().trim();
+                                    if (!href || href.startsWith('javascript:') || href.startsWith('#')) return;
+                                    if (!fallbackLink) fallbackLink = href;
+                                    if (txt.length > 1 && !/^[-.\\s]+$/.test(txt)) {
+                                        if (!bestTitle || bestTitle.length < txt.length) {
+                                            bestLink = href;
+                                            bestTitle = txt;
+                                        }
+                                    } else if (!bestTitle) {
+                                        const img = lEl.find('img');
+                                        const alt = img.attr('alt') || lEl.attr('title');
+                                        if (alt && alt.trim().length > 1 && !/^[-.\\s]+$/.test(alt.trim())) {
+                                            bestLink = href;
+                                            bestTitle = alt.trim();
+                                        }
+                                    }
+                                });
+
+                                // If parent is an <a> tag itself, use it
+                                if (!bestLink && parentRow.is('a')) {
+                                    bestLink = parentRow.attr('href') || null;
+                                    if (!bestTitle) {
+                                        const img = parentRow.find('img');
+                                        bestTitle = img.attr('alt') || parentRow.text().trim();
+                                    }
+                                }
+
+                                // Fallback title from dt, strong, span, p, h4 etc.
+                                const garbageRegex = /^([-.\\s]+|작성날짜|작성자|조회수|공유|페이스북|트위터|카카오스토리|네이버밴드|오규태|오태규|새로운글|새글|\\d{4}[-.]\\d{2}[-.]\\d{2})$/;
+                                if ((!bestTitle || bestTitle.length <= 1 || garbageRegex.test(bestTitle)) && (bestLink || fallbackLink)) {
+                                    const candidates = parentRow.find('dt, .subject, .title, strong, h4, h5, dd, .tit, .txt, p, span');
+                                    candidates.each((_, el) => {
+                                        const t = $r(el).text().trim();
+                                        if (t.length > 1 && !garbageRegex.test(t) && !t.includes('작성날짜') && !t.includes('작성자')) {
+                                            bestTitle = t;
+                                            if (!bestLink) bestLink = fallbackLink;
+                                            return false;
+                                        }
+                                    });
+                                }
+
+                                if (bestLink && bestTitle && elementDate >= targetDate) {
+                                    const fullLink = (bestLink as string).startsWith('http') ? (bestLink as string) : new URL(bestLink as string, url).toString();
+                                    if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {
+                                        const dateString = elementDate.toISOString().split('T')[0];
+                                        console.log(`[Puppeteer] ADDING POST: ${bestTitle} (${dateString})`);
+                                        posts.push({ title: bestTitle, link: fullLink, date: dateString });
+                                    }
+                                }
+                            }
+                        }
+                    });
+                    console.log(`[Scraper] Puppeteer fallback found ${posts.length} posts`);
+                }
+            } catch (puppeteerErr) {
+                console.error('[Scraper] Puppeteer fallback failed:', puppeteerErr);
+            }
+        }
+
         // 2. Scrape details for each post
         const detailedPosts = [];
 
@@ -250,17 +358,59 @@ export async function POST(request: Request) {
         for (const post of postsToScrape) {
             try {
                 const detailRes = await fetch(post.link);
-                const detailHtml = await detailRes.text();
+                let detailHtml = await detailRes.text();
+
+                // ── Dynamic Detail Page Fallback ──
+                // If static HTML looks like it requires JS rendering (common on gg.go.kr etc.)
+                const isAjaxLoaded = detailHtml.includes('데이터 조회중') || detailHtml.includes('dataLoading');
+                const staticCheerio = cheerio.load(detailHtml);
+                const staticContentSel = '.bv_cont, .bv_contents, .bbs_view01, #bo_v_con, .view-content, .post_content, .view_cont, .bbs_view, .view_contents, .board_view_con, .view_text, .bbs_content, .board_view';
+                const hasStaticContent = staticCheerio(staticContentSel).first().text().trim().length > 50;
+
+                if (isAjaxLoaded || !hasStaticContent) {
+                    console.log(`[Scraper] Detail page may be AJAX-loaded, trying Puppeteer: ${post.link}`);
+                    try {
+                        const renderedDetail = await renderWithPuppeteer(post.link);
+                        if (renderedDetail) {
+                            detailHtml = renderedDetail;
+                        }
+                    } catch (e) {
+                        console.error('[Scraper] Puppeteer detail fallback failed:', e);
+                    }
+                }
+
                 const $$ = cheerio.load(detailHtml);
 
                 // Heuristic for content: text inside generic content containers
-                // Common K-board/Gnuboard/eGovFrame selectors:
-                // Heuristic for content: text inside generic content containers
-                // Common K-board/Gnuboard/eGovFrame selectors:
-                const containerSelector = '.bv_cont, .bv_contents, .bbs_view01, #bo_v_con, .view-content, .post_content, article, .content, #content, .view_cont, .bbs_view, .p-table__content, .db_data, .view_contents, .txt-area, .board_view_con, .con-area, .view_text, .bbs_content, .board-text, .board_view, .open_inner';
-                let container = $$(containerSelector).first();
+                // Two-pass approach: specific board selectors first, then generic fallback
+                // Pass 1: Specific content-area selectors (high confidence)
+                const specificSelectors = '.board_hongbo3_wrap, .s-v-board-default, .bv_cont, .bv_contents, .bbs_view01, #bo_v_con, .view-content, .post_content, .view_cont, .bbs_view, .p-table__content, .db_data, .view_contents, .txt-area, .board_view_con, .con-area, .view_text, .bbs_content, .board-text, .board_view, .open_inner';
+                // Pass 2: Generic fallback selectors (lower confidence — can match navbars etc.)
+                const genericSelectors = 'article, .content, #content';
 
-                if (container.length === 0) {
+                // Smart container selection: pick the best-matching container by text length
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                let container: ReturnType<typeof $$> = null as any;
+                let bestContainerLen = 0;
+                const allSelectors = specificSelectors.split(',').map(s => s.trim()).concat(genericSelectors.split(',').map(s => s.trim()));
+
+                for (const sel of allSelectors) {
+                    const candidates = $$(sel);
+                    candidates.each((_, el) => {
+                        const elText = $$(el).text().trim();
+                        // Skip containers that look like navigation/search headers
+                        if (elText.length < 50) return;
+                        if (/^자동완성|^통합검색|^추천검색어/.test(elText)) return;
+                        if (elText.length > bestContainerLen) {
+                            bestContainerLen = elText.length;
+                            container = $$(el);
+                        }
+                    });
+                    // Once we find a substantial specific-selector match, stop
+                    if (bestContainerLen > 200 && specificSelectors.includes(sel)) break;
+                }
+
+                if (!container || container.length === 0) {
                     // Try finding any div with significant text if no container match
                     let maxLen = 0;
                     $$('div').each((_, el) => {
@@ -281,7 +431,7 @@ export async function POST(request: Request) {
 
                 let content = "";
 
-                if (container.length > 0) {
+                if (container && container.length > 0) {
                     // 1. Cleaning: Remove unwanted elements (scripts, styles, UI, headers, footers)
                     const cleanContainer = container.clone();
 
@@ -427,6 +577,8 @@ export async function POST(request: Request) {
                         if ($el.hasClass('view-direct')) return;
                         if (href.includes('preImageFromDoc.do')) return;
                         if (name.includes('사진 확대보기')) return;
+                        // Filter out inline content navigation links (not file attachments)
+                        if (name === '바로가기' || name === '게이트 위치보기' || name === '자세히 보기' || name === '자세히보기' || name === '더보기' || name === '보기') return;
 
                         // Fix for "Download" or "파일" generic names
                         // MFDS case: The link text might be "다운로드" or empty, or "다운받기"
@@ -488,6 +640,8 @@ export async function POST(request: Request) {
                                 if ($el.hasClass('view-direct')) return;
                                 if (href.includes('preImageFromDoc.do')) return;
                                 if (name.includes('사진 확대보기')) return;
+                                // Filter out inline content navigation links (not file attachments)
+                                if (name === '바로가기' || name === '게이트 위치보기' || name === '자세히 보기' || name === '자세히보기' || name === '더보기' || name === '보기') return;
 
                                 const fileName = name || "Attached File";
                                 files.push({ name: fileName, url: href });
@@ -527,6 +681,8 @@ export async function POST(request: Request) {
                                     if (name.includes('이미지 다운로드') || name.includes('파일 다운로드')) return; // Filter generic button labels
                                     if ($a.hasClass('view-direct')) return;
                                     if (href.includes('preImageFromDoc.do')) return;
+                                    // Filter out inline content navigation links (not file attachments)
+                                    if (name === '바로가기' || name === '게이트 위치보기' || name === '자세히 보기' || name === '자세히보기' || name === '더보기' || name === '보기') return;
 
                                     const fileName = name || "Attached File";
                                     files.push({ name: fileName, url: href });

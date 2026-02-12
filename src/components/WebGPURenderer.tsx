@@ -1883,6 +1883,9 @@ export default function WebGPURenderer({
 
                                                     const p = entranceProgress; // Alias for consistency
 
+                                                    // Transform around the text position (drawX, drawY)
+                                                    ctx.translate(drawX, drawY);
+
                                                     if (animation === 'pop') {
                                                         const scale = 1 + Math.sin(p * Math.PI) * (0.2 * intensity);
                                                         ctx.scale(scale, scale);
@@ -2122,7 +2125,7 @@ export default function WebGPURenderer({
                                                     ctx.save();
                                                     ctx.globalAlpha = nBgOpacity;
                                                     ctx.fillStyle = narrationBackgroundColor || "#000000";
-                                                    ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans - serif`;
+                                                    ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans-serif`;
 
                                                     // Calculate vertical centering for the text block within the bottom bar
                                                     // matches drawTextLayout logic: startY = y + (h - totalHeight) / 2 + (lineHeight / 2)
@@ -2160,7 +2163,7 @@ export default function WebGPURenderer({
                                             }
 
                                             ctx.fillStyle = narrationColor;
-                                            ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans - serif`;
+                                            ctx.font = `bold ${narrationFontSize}px '${narrationFont}', sans-serif`;
 
                                             const textMetrics = ctx.measureText(scene.text);
                                             const textWidth = textMetrics.width;

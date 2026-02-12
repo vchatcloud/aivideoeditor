@@ -1,6 +1,10 @@
 {
-  "access_token": "ya29.A0AUMWg_KAc37Y8KBhNp521LMrgnotKl_Qcq0THJucexa-G2OkgVoRcjC9YL8lb1jOb0CF-_VsVmBcmX6cSaOglN3kTuZcy03QlKMxLJD2HxVmNHVu_uV3bYXFTkXCOxqZRLsMYcW2ak0vsvZnR1O9Fg1-_9xQzNtQnot9RWwnOLBou1q7ZC3DfFizx4voFGOHITJ8efgNkfASXrNGmAUc3KYmnnjeGQtZKmf101ywI0IDnNJBfDPngVZTWStt2IDbyw0OXmPL7_BC-RcGwNN244kmKC8aCgYKAfoSARUSFQHGX2MiHo0yVOXzkMryw8H3a_NC6w0290",
+  "access_token": "ya29.a0AUMWg_LzDk6PF25L9ivuwuRdmxtuH_SaQxeMTa6F0hKcVb86Ajv7dO3MRReWTFM8abBZalzZWfSZ1zVJiMWZROqvF7buOpZnsYIDfOeFwx8PLEnI-ASQpYtNUQRJJM9U5Z1fPyf2dJnZ2Zylaj9Tc0OjsQTwKkYUsHN6CJYELwtDRXxi7cEK0UbLvm2V8L8BcYzvkpk9aCgYKAYISARUSFQHGX2Miq-1NFC68swqT91pG_NM-gQ0207",
+  "refresh_token": "1//0eL7HRd_j-9V4CgYIARAAGA4SNwF-L9IrzPLoQKHCJs20c6Xe7K76Rt0jfAImROk12fS8A_hyAT4j8DMUKxuFrssn7iTDeeu3q_c",
   "scope": "https://www.googleapis.com/auth/youtube.upload https://www.googleapis.com/auth/youtube.readonly",
   "token_type": "Bearer",
-  "expiry_date": 1770344742037
+  "refresh_token_expires_in": 591064,
+  "expiry_date": 1770891788755,
+  "channelName": "AI로 그리는 새로운 상상력, [MenuOn]",
+  "channelIcon": "https://yt3.ggpht.com/6BdZbbBPTdUUrdhQwIcd3aF96L-XUIdqABmTYV4ozphrF88273vXNqSNK9_LYINNFKybiIBBSw=s88-c-k-c0x00ffffff-no-rj"
 }
