@@ -14,6 +14,7 @@ export interface NarrationScene {
     audioUrl?: string | null;
     audioDuration?: number;
     isEnabled: boolean;
+    isAudioGenerating?: boolean;
     narrationSettings?: {
         voice?: string;
         speed?: number;
@@ -570,7 +571,33 @@ export default function NarrationStudio({
                             const hasOverrides = scene.narrationSettings && Object.keys(scene.narrationSettings).length > 0;
 
                             return (
-                                <div key={idx} className={`bg-[#1a1a1a] border border-gray-800 rounded-lg transition-all ${expandedIndex === idx ? 'ring-1 ring-blue-500/50' : 'hover:border-gray-700'}`}>
+                                <div key={idx} className={`relative bg-[#1a1a1a] border rounded-lg transition-all overflow-hidden ${scene.isAudioGenerating
+                                        ? 'border-cyan-500/60 shadow-lg shadow-cyan-500/10 ring-1 ring-cyan-500/30'
+                                        : expandedIndex === idx
+                                            ? 'border-gray-800 ring-1 ring-blue-500/50'
+                                            : 'border-gray-800 hover:border-gray-700'
+                                    }`}>
+
+                                    {/* Audio Generating Overlay */}
+                                    {scene.isAudioGenerating && (
+                                        <div className="absolute inset-0 z-10 flex flex-col items-center justify-center bg-black/60 backdrop-blur-[2px] gap-2">
+                                            {/* Sound Wave Bars */}
+                                            <div className="flex items-end gap-1 h-8">
+                                                {[0.4, 0.7, 1.0, 0.8, 0.5, 0.9, 0.6, 1.0, 0.7, 0.4].map((h, i) => (
+                                                    <div
+                                                        key={i}
+                                                        className="w-1 rounded-full bg-cyan-400"
+                                                        style={{
+                                                            height: `${h * 100}%`,
+                                                            animation: `narration-bar 0.8s ease-in-out ${i * 0.08}s infinite alternate`,
+                                                        }}
+                                                    />
+                                                ))}
+                                            </div>
+                                            <span className="text-xs font-bold text-cyan-300 tracking-widest uppercase animate-pulse">음성 생성 중...</span>
+                                        </div>
+                                    )}
+
                                     {/* Summary Row */}
                                     <div className="p-3 flex items-center gap-4 cursor-pointer" onClick={() => toggleOverride(idx)}>
                                         <div className="w-8 h-8 rounded bg-gray-800 flex items-center justify-center text-xs font-mono text-gray-500">

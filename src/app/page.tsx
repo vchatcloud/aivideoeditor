@@ -1,7 +1,7 @@
 ﻿"use client";
 import { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import clsx from "clsx";
-import { Play, Pause, RotateCw, RotateCcw, X, FileVideo, Wand2, Upload, Loader2, CheckCircle, AlertCircle, Image as ImageIcon, Sparkles, Video as VideoIcon, ThumbsUp, Pencil, Film, Clock, Globe, Calendar, FileText, Music, Settings, MessageSquare, Heart, RefreshCw, Save, Trash2, FolderOpen, ChevronRight, ChevronDown, Info, Palette, LayoutTemplate, QrCode, List, Plus, Copy, ShieldCheck, Square, History as HistoryIcon, ArrowUp, ArrowDown } from 'lucide-react';
+import { Play, Pause, RotateCw, RotateCcw, X, FileVideo, Wand2, Upload, Loader2, CheckCircle, CheckCircle2, AlertCircle, XCircle, Image as ImageIcon, Sparkles, Video as VideoIcon, ThumbsUp, Pencil, Film, Clock, Globe, Calendar, FileText, Music, Settings, MessageSquare, Heart, RefreshCw, Save, Trash2, FolderOpen, ChevronRight, ChevronDown, Info, Palette, LayoutTemplate, QrCode, List, Plus, Copy, ShieldCheck, Square, History as HistoryIcon, ArrowUp, ArrowDown, Search } from 'lucide-react';
 import WebGPURenderer, { MediaAsset } from "@/components/WebGPURenderer";
 import NarrationStudio, { VOICE_DATA } from "@/components/NarrationStudio";
 import SNSUploadModal from "@/components/SNSUploadModal";
@@ -11,7 +11,8 @@ import ProjectGallery from "@/components/ProjectGallery";
 import QRCode from 'qrcode';
 
 // Shared Types & Constants
-import type { Scene, ProjectHistoryItem, ScrapedPost, AnalysisResult, SceneItem, CaptionConfig } from '@/types';
+import type { Scene, ProjectHistoryItem, ScrapedPost, AnalysisResult, SceneItem, CaptionConfig, PostFilter, WatermarkConfig, ThumbnailConfig, ThumbnailPlatformKey } from '@/types';
+import { DEFAULT_WATERMARK_CONFIG, THUMBNAIL_PLATFORMS } from '@/types';
 import {
   ASPECT_RATIOS, VISUAL_STYLES, COMPOSITION_STYLES, MOOD_STYLES,
   INTERPRETATION_STYLES, CAPTION_PRESETS, FONT_DISPLAY_MAP, FONT_OPTIONS
@@ -21,7 +22,8 @@ const NO_OP = () => { };
 
 export default function Home() {
   const [url, setUrl] = useState("https://www.seocho.go.kr/site/seocho/ex/bbs/List.do?cbIdx=57");
-  const [date, setDate] = useState("");
+  const [dateStart, setDateStart] = useState("");
+  const [dateEnd, setDateEnd] = useState("");
   const [isProcessing, setIsProcessing] = useState(false);
   const [logs, setLogs] = useState<{ type: 'text' | 'image' | 'prompt', content: string }[]>([]);
   const [error, setError] = useState("");
@@ -35,8 +37,7 @@ export default function Home() {
 
 
   // Site Management State
-  // Site Management State
-  const [sites, setSites] = useState<{ id?: string, name: string, url: string }[]>([]);
+  const [sites, setSites] = useState<{ id?: string; name: string; url: string; type?: string; prompt?: string; topN?: number; boards?: { id: string; name: string; url: string; enabled: boolean }[] }[]>([]);
 
 
   // Filtering State
@@ -47,9 +48,22 @@ export default function Home() {
   const [filterTitle, setFilterTitle] = useState("");
   const [filterHideExisting, setFilterHideExisting] = useState(false);
 
+  // Post Filter System State
+  const [savedFilters, setSavedFilters] = useState<PostFilter[]>([]);
+  const [activeFilterIds, setActiveFilterIds] = useState<string[]>([]);
+  const [showFilterManager, setShowFilterManager] = useState(false);
+  const [isClassifying, setIsClassifying] = useState(false);
+  const [filterHideExcluded, setFilterHideExcluded] = useState(false);
+  const [newFilterName, setNewFilterName] = useState("");
+  const [newFilterDesc, setNewFilterDesc] = useState("");
+  const [newFilterType, setNewFilterType] = useState<'include' | 'exclude'>('include');
+  const [contentEditMode, setContentEditMode] = useState(false);
+
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [sceneItems, setSceneItems] = useState<SceneItem[]>([]);
   const [videoBlobUrl, setVideoBlobUrl] = useState<string | null>(null);
+  const [isConvertingMp4, setIsConvertingMp4] = useState(false);
+  const [showDownloadMenu, setShowDownloadMenu] = useState(false);
   const [showRenderer, setShowRenderer] = useState(false);
   const [analysisMode, setAnalysisMode] = useState<'detail' | 'summary' | 'promo' | 'infographic' | 'album'>('detail');
   const [videoPurpose, setVideoPurpose] = useState<'PR' | 'Education' | 'Notice' | 'Event'>('PR');
@@ -243,7 +257,21 @@ export default function Home() {
   const [isAddingSite, setIsAddingSite] = useState(false);
   const [newSiteName, setNewSiteName] = useState("");
   const [newSiteUrl, setNewSiteUrl] = useState("");
+  const [siteAddType, setSiteAddType] = useState<'single' | 'group' | 'ai'>('single');
+  const [newAiPrompt, setNewAiPrompt] = useState("");
+  const [newAiTopN, setNewAiTopN] = useState<number>(10);
+  const [discoveredBoards, setDiscoveredBoards] = useState<{ name: string; url: string }[]>([]);
+  const [selectedBoards, setSelectedBoards] = useState<Set<number>>(new Set());
+  const [isDiscovering, setIsDiscovering] = useState(false);
+  const [expandedSiteId, setExpandedSiteId] = useState<string | null>(null);
+  const [boardFilterDesc, setBoardFilterDesc] = useState("");
+  const [isFilteringBoards, setIsFilteringBoards] = useState(false);
+  const [boardFilterResults, setBoardFilterResults] = useState<{ index: number; relevant: boolean; score?: number; reason?: string }[]>([]);
+  const [boardFilterCount, setBoardFilterCount] = useState<number>(5);
   const [showSaveOptions, setShowSaveOptions] = useState(false);
+
+  // Multi-post selection
+  const [selectedPostIds, setSelectedPostIds] = useState<Set<number>>(new Set());
 
   // Dynamic Caption Configuration
   const [captionConfig, setCaptionConfig] = useState<CaptionConfig>({
@@ -273,6 +301,8 @@ export default function Home() {
   const [editingSiteId, setEditingSiteId] = useState<string | null>(null);
   const [editSiteName, setEditSiteName] = useState("");
   const [editSiteUrl, setEditSiteUrl] = useState("");
+  const [editAiPrompt, setEditAiPrompt] = useState("");
+  const [editAiTopN, setEditAiTopN] = useState<number>(10);
 
 
   const [selectedAspectRatio, setSelectedAspectRatio] = useState("16:9");
@@ -300,14 +330,46 @@ export default function Home() {
       });
   }, []);
 
+  // Load filters from AirTable on mount
+  useEffect(() => {
+    fetch('/api/filters')
+      .then(res => res.json())
+      .then(data => {
+        if (Array.isArray(data)) {
+          setSavedFilters(data);
+          setActiveFilterIds(data.map((f: PostFilter) => f.id));
+        } else {
+          console.error("Failed to load filters:", data.error);
+        }
+      })
+      .catch(err => console.error("Failed to load filters:", err));
+  }, []);
+
   const handleAddSite = async () => {
     if (!newSiteName.trim() || !newSiteUrl.trim()) return;
 
     try {
+      const payload: any = { name: newSiteName.trim(), url: newSiteUrl.trim(), type: siteAddType };
+      if (siteAddType === 'group') {
+        const boards = discoveredBoards.filter((_, i) => selectedBoards.has(i));
+        if (boards.length === 0) {
+          alert('하위 게시판을 선택해주세요.');
+          return;
+        }
+        payload.boards = boards;
+      } else if (siteAddType === 'ai') {
+        if (!newAiPrompt.trim()) {
+          alert('AI 검색 프롬프트를 입력해주세요.');
+          return;
+        }
+        payload.prompt = newAiPrompt.trim();
+        payload.topN = newAiTopN;
+      }
+
       const res = await fetch('/api/sites', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: newSiteName.trim(), url: newSiteUrl.trim() })
+        body: JSON.stringify(payload)
       });
       const newSite = await res.json();
       if (newSite.error) throw new Error(newSite.error);
@@ -315,7 +377,14 @@ export default function Home() {
       setSites(prev => [newSite, ...prev]);
       setNewSiteName("");
       setNewSiteUrl("");
+      setNewAiPrompt("");
+      setNewAiTopN(10);
       setIsAddingSite(false);
+      setSiteAddType('single');
+      setDiscoveredBoards([]);
+      setSelectedBoards(new Set());
+      setBoardFilterResults([]);
+      setBoardFilterDesc("");
     } catch (e: any) {
       console.error("Failed to add site", e);
       alert("사이트 등록 실패: " + e.message);
@@ -338,25 +407,44 @@ export default function Home() {
     }
   };
 
-  const handleEditClick = (site: { id: string; name: string; url: string }) => {
-    setEditingSiteId(site.id);
+  const handleEditClick = (site: { id: string; name: string; url: string; type?: string; prompt?: string; topN?: number }) => {
+    setEditingSiteId(site.id || null);
     setEditSiteName(site.name);
     setEditSiteUrl(site.url);
+    if (site.type === 'ai') {
+      setEditAiPrompt(site.prompt || "");
+      setEditAiTopN(site.topN || 10);
+    }
+    // Auto-expand group site accordion
+    if (site.type === 'group') {
+      setExpandedSiteId(site.id);
+    }
+    // Reset edit-mode discovery state
+    setEditDiscoveredBoards([]);
+    setEditSelectedBoards(new Set());
+    setIsEditDiscovering(false);
   };
 
   const handleUpdateSite = async () => {
     if (!editingSiteId || !editSiteName.trim() || !editSiteUrl.trim()) return;
 
     try {
+      const currentSite = sites.find(s => s.id === editingSiteId);
+      const payload: any = { id: editingSiteId, name: editSiteName.trim(), url: editSiteUrl.trim() };
+      if (currentSite?.type === 'ai') {
+        payload.prompt = editAiPrompt.trim();
+        payload.topN = editAiTopN;
+      }
+
       const res = await fetch('/api/sites', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: editingSiteId, name: editSiteName.trim(), url: editSiteUrl.trim() })
+        body: JSON.stringify(payload)
       });
       const updatedSite = await res.json();
       if (updatedSite.error) throw new Error(updatedSite.error);
 
-      setSites(prev => prev.map(s => s.id === editingSiteId ? updatedSite : s));
+      setSites(prev => prev.map(s => s.id === editingSiteId ? { ...s, ...updatedSite } : s));
       setEditingSiteId(null);
       setEditSiteName("");
       setEditSiteUrl("");
@@ -365,6 +453,191 @@ export default function Home() {
       alert("사이트 수정 실패: " + e.message);
     }
   };
+
+  // Edit-mode board discovery states
+  const [editDiscoveredBoards, setEditDiscoveredBoards] = useState<{ name: string; url: string }[]>([]);
+  const [editSelectedBoards, setEditSelectedBoards] = useState<Set<number>>(new Set());
+  const [isEditDiscovering, setIsEditDiscovering] = useState(false);
+
+  const handleEditDiscoverBoards = async (siteUrl: string) => {
+    setIsEditDiscovering(true);
+    setEditDiscoveredBoards([]);
+    setEditSelectedBoards(new Set());
+    try {
+      const res = await fetch('/api/discover-boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: siteUrl })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const boards = data.boards || [];
+      // Filter out boards already in the site
+      const editingSite = sites.find(s => s.id === editingSiteId);
+      const existingUrls = new Set(editingSite?.boards?.map(b => b.url) || []);
+      const newBoards = boards.filter((b: any) => !existingUrls.has(b.url));
+      setEditDiscoveredBoards(newBoards);
+      setEditSelectedBoards(new Set<number>(newBoards.map((_: any, i: number) => i)));
+
+      // Auto-run AI filter if description is set
+      if (boardFilterDesc.trim() && newBoards.length > 0) {
+        try {
+          setIsFilteringBoards(true);
+          const filterRes = await fetch('/api/filter-boards', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ boards: newBoards, description: boardFilterDesc.trim() })
+          });
+          const filterData = await filterRes.json();
+          if (!filterData.error) {
+            const results: { index: number; relevant: boolean; score?: number }[] = filterData.results || [];
+            const sorted = [...results].filter(r => r.relevant).sort((a, b) => (b.score || 0) - (a.score || 0));
+            const topIndices = sorted.slice(0, boardFilterCount).map(r => r.index);
+            setEditSelectedBoards(new Set<number>(topIndices));
+          }
+        } catch (filterErr) {
+          console.error('Edit AI filter failed:', filterErr);
+        } finally {
+          setIsFilteringBoards(false);
+        }
+      }
+    } catch (e: any) {
+      console.error('Failed to discover boards', e);
+      alert('게시판 탐색 실패: ' + e.message);
+    } finally {
+      setIsEditDiscovering(false);
+    }
+  };
+
+  const handleAddBoardsToGroup = async (parentId: string) => {
+    const boardsToAdd = editDiscoveredBoards.filter((_, i) => editSelectedBoards.has(i));
+    if (boardsToAdd.length === 0) return;
+
+    try {
+      const res = await fetch('/api/sites', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'add-boards', parentId, boards: boardsToAdd })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+
+      // Update sites state with new boards
+      setSites(prev => prev.map(s => {
+        if (s.id === parentId) {
+          return { ...s, boards: [...(s.boards || []), ...(data.boards || [])] };
+        }
+        return s;
+      }));
+      setEditDiscoveredBoards([]);
+      setEditSelectedBoards(new Set());
+    } catch (e: any) {
+      console.error('Failed to add boards', e);
+      alert('게시판 추가 실패: ' + e.message);
+    }
+  };
+
+  const handleDiscoverBoards = async () => {
+    if (!newSiteUrl.trim()) return;
+    setIsDiscovering(true);
+    setDiscoveredBoards([]);
+    setSelectedBoards(new Set());
+    setBoardFilterResults([]);
+    try {
+      const res = await fetch('/api/discover-boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: newSiteUrl.trim() })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const boards = data.boards || [];
+      setDiscoveredBoards(boards);
+
+      // If AI filter description is set, auto-trigger filtering
+      if (boardFilterDesc.trim() && boards.length > 0) {
+        setIsDiscovering(false);
+        await runBoardFilter(boards, boardFilterDesc.trim(), boardFilterCount);
+      } else {
+        // No filter — select all
+        setSelectedBoards(new Set<number>(boards.map((_: any, i: number) => i)));
+      }
+    } catch (e: any) {
+      console.error("Failed to discover boards", e);
+      alert("게시판 탐색 실패: " + e.message);
+    } finally {
+      setIsDiscovering(false);
+    }
+  };
+
+  const runBoardFilter = async (boards: { name: string; url: string }[], description: string, topN: number) => {
+    setIsFilteringBoards(true);
+    setBoardFilterResults([]);
+    try {
+      const res = await fetch('/api/filter-boards', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ boards, description })
+      });
+      const data = await res.json();
+      if (data.error) throw new Error(data.error);
+      const results: { index: number; relevant: boolean; score?: number; reason?: string }[] = data.results || [];
+      setBoardFilterResults(results);
+      // Sort by score descending, select top N relevant
+      const sorted = [...results].filter(r => r.relevant).sort((a, b) => (b.score || 0) - (a.score || 0));
+      const topIndices = sorted.slice(0, topN).map(r => r.index);
+      setSelectedBoards(new Set<number>(topIndices));
+    } catch (e: any) {
+      console.error('Failed to filter boards', e);
+      alert('AI 필터링 실패: ' + e.message);
+    } finally {
+      setIsFilteringBoards(false);
+    }
+  };
+
+  const handleFilterBoards = async () => {
+    if (!boardFilterDesc.trim() || discoveredBoards.length === 0) return;
+    await runBoardFilter(discoveredBoards, boardFilterDesc.trim(), boardFilterCount);
+  };
+
+  const handleToggleBoardEnabled = async (boardId: string, enabled: boolean) => {
+    try {
+      const res = await fetch('/api/sites', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: boardId, enabled })
+      });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      // Update local state
+      setSites(prev => prev.map(site => ({
+        ...site,
+        boards: site.boards?.map(b => b.id === boardId ? { ...b, enabled } : b)
+      })));
+    } catch (e: any) {
+      console.error("Failed to toggle board", e);
+    }
+  };
+
+  const handleDeleteBoard = async (boardId: string) => {
+    try {
+      const res = await fetch(`/api/sites?id=${boardId}`, { method: 'DELETE' });
+      const result = await res.json();
+      if (result.error) throw new Error(result.error);
+      setSites(prev => prev.map(site => ({
+        ...site,
+        boards: site.boards?.filter(b => b.id !== boardId)
+      })));
+    } catch (e: any) {
+      console.error("Failed to delete board", e);
+    }
+  };
+
+  // Find the selected group site (if any) for multi-board scraping
+  const normalizeUrl = (u: string) => u.replace(/\/+$/, '').toLowerCase();
+  const selectedGroupSite = sites.find(s => s.type === 'group' && normalizeUrl(s.url) === normalizeUrl(url));
+  const selectedAiSite = sites.find(s => s.type === 'ai' && normalizeUrl(s.url) === normalizeUrl(url));
+
   // Audio Simulation Mode
   const [isAudioSimulation, setIsAudioSimulation] = useState(false);
   // Image Preview Modal State
@@ -376,7 +649,7 @@ export default function Home() {
 
   // AI Disclosure & Watermark State (Restored)
   const [aiDisclosureEnabled, setAiDisclosureEnabled] = useState(true);
-  const [watermarkUrl, setWatermarkUrl] = useState<string | null>(null);
+  const [watermarkConfig, setWatermarkConfig] = useState<WatermarkConfig>(DEFAULT_WATERMARK_CONFIG);
   const [isUploadingWatermark, setIsUploadingWatermark] = useState(false);
 
   const [previewQuality, setPreviewQuality] = useState<'high' | 'low'>('low'); // Default to Performance mode for preview
@@ -479,6 +752,26 @@ export default function Home() {
   const [qrCodeImage, setQrCodeImage] = useState<string | null>(null);
   const [qrCodeSize, setQrCodeSize] = useState(120);
   const [qrCodePosition, setQrCodePosition] = useState<'top-left' | 'top-right' | 'bottom-left' | 'bottom-right'>('top-right');
+
+  // Thumbnail Studio State
+  const [thumbnailConfig, setThumbnailConfig] = useState<ThumbnailConfig>({
+    sceneIndex: 0,
+    platform: 'youtube',
+    title: '',
+    titleStyle: 'bold_bottom',
+    bgBlur: 0,
+    textColor: '#FFFFFF',
+    strokeColor: '#000000',
+    overlayDarkness: 0.55,
+  });
+  const [thumbnailPreviewUrl, setThumbnailPreviewUrl] = useState<string | null>(null);
+  const [isGeneratingThumb, setIsGeneratingThumb] = useState(false);
+  const [showThumbnailStudio, setShowThumbnailStudio] = useState(false);
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+  const [isLoadingTitles, setIsLoadingTitles] = useState(false);
+  const [showTitleSuggestions, setShowTitleSuggestions] = useState(false);
+
+
 
   // Update QR URL when post is scraped
   useEffect(() => {
@@ -717,7 +1010,7 @@ export default function Home() {
     subtitleSpeed,
     audioEnabled,
     aiDisclosureEnabled,
-    watermarkUrl,
+    watermarkConfig,
     selectedPlatform,
     customWidth,
     customHeight,
@@ -801,6 +1094,106 @@ export default function Home() {
     });
   };
 
+  // ─── Smart Thumbnail Compositor ───────────────────────────────────────────
+  const generateSmartThumbnail = async (config: ThumbnailConfig): Promise<Blob | null> => {
+    const platform = THUMBNAIL_PLATFORMS[config.platform];
+    const scene = sceneItems[config.sceneIndex];
+    const imgUrl = scene?.imageUrl;
+    if (!imgUrl) return null;
+
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => {
+        const canv = document.createElement('canvas');
+        canv.width = platform.w;
+        canv.height = platform.h;
+        const ctx = canv.getContext('2d')!;
+
+        // 1. Cover-fit crop
+        const scale = Math.max(platform.w / img.width, platform.h / img.height);
+        const sw = platform.w / scale;
+        const sh = platform.h / scale;
+        const sx = (img.width - sw) / 2;
+        const sy = (img.height - sh) / 2;
+
+        if (config.bgBlur > 0) ctx.filter = `blur(${config.bgBlur}px)`;
+        ctx.drawImage(img, sx, sy, sw, sh, 0, 0, platform.w, platform.h);
+        ctx.filter = 'none';
+
+        // 2. Dark gradient overlay
+        const darkness = Math.min(0.92, config.overlayDarkness);
+        const grad = ctx.createLinearGradient(0, platform.h * 0.35, 0, platform.h);
+        grad.addColorStop(0, 'rgba(0,0,0,0)');
+        grad.addColorStop(1, `rgba(0,0,0,${darkness})`);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, platform.w, platform.h);
+
+        // 3. Text rendering
+        const drawTitle = (text: string) => {
+          const style = config.titleStyle;
+          const fSize = Math.round(platform.w * 0.065); // ~125px at 1920px wide
+          const margin = platform.w * 0.05;
+
+          ctx.save();
+          ctx.font = `bold ${fSize}px 'Pretendard', 'Noto Sans KR', sans-serif`;
+          ctx.textAlign = 'center';
+          ctx.lineJoin = 'round';
+          ctx.miterLimit = 2;
+
+          // Word-wrap at 82% canvas width
+          const maxW = platform.w * 0.82;
+          const words = text.split(' ');
+          const lines: string[] = [];
+          let cur = '';
+          for (const w of words) {
+            const test = cur ? cur + ' ' + w : w;
+            if (ctx.measureText(test).width > maxW && cur) {
+              lines.push(cur);
+              cur = w;
+            } else { cur = test; }
+          }
+          if (cur) lines.push(cur);
+
+          const lineH = fSize * 1.25;
+          const totalH = lines.length * lineH;
+          const cx = platform.w / 2;
+
+          let startY: number;
+          if (style === 'gradient_top') {
+            startY = margin + lineH;
+          } else if (style === 'center_glow') {
+            startY = (platform.h - totalH) / 2 + lineH * 0.8;
+            ctx.shadowColor = 'rgba(255,255,255,0.5)';
+            ctx.shadowBlur = fSize * 0.5;
+          } else { // bold_bottom or minimal
+            startY = platform.h - margin - totalH + lineH * 0.8;
+          }
+
+          lines.forEach((line, i) => {
+            const ly = startY + i * lineH;
+            ctx.lineWidth = fSize * 0.07;
+            ctx.strokeStyle = config.strokeColor;
+            ctx.strokeText(line, cx, ly);
+            ctx.fillStyle = config.textColor;
+            ctx.fillText(line, cx, ly);
+          });
+          ctx.restore();
+        };
+
+        if (config.title) drawTitle(config.title);
+
+        // 4. Export JPEG 0.85 (< 2MB for YouTube)
+        canv.toBlob((blob) => resolve(blob), 'image/jpeg', 0.85);
+      };
+      img.onerror = () => resolve(null);
+      // CORS: use proxy for external URLs
+      img.src = imgUrl.startsWith('http')
+        ? `/api/proxy-image?url=${encodeURIComponent(imgUrl)}`
+        : imgUrl;
+    });
+  };
+
   const addLog = (type: 'text' | 'image' | 'prompt', content: string) => {
     setLogs(prev => [...prev, { type, content }]);
   };
@@ -827,6 +1220,36 @@ export default function Home() {
     }
   };
 
+  // Scrape progress state for group sites
+  type BoardScrapeStatus = 'pending' | 'scraping' | 'done' | 'error';
+  type BoardScrapeProgress = {
+    boardName: string;
+    boardUrl: string;
+    status: BoardScrapeStatus;
+    postCount: number;
+    error?: string;
+  };
+  const [scrapeProgress, setScrapeProgress] = useState<BoardScrapeProgress[]>([]);
+  const [isScrapeProgressOpen, setIsScrapeProgressOpen] = useState(false);
+  const scrapeAbortRef = useRef(false);
+  const scrapeAbortControllerRef = useRef<AbortController | null>(null);
+
+  const cleanPostTitle = (title: string) => {
+    let cleanTitle = title.trim();
+    const words = cleanTitle.split(/\s+/);
+    if (words.length >= 2 && words.length % 2 === 0) {
+      const half = words.length / 2;
+      const firstHalf = words.slice(0, half).join(' ');
+      const secondHalf = words.slice(half).join(' ');
+      if (firstHalf === secondHalf) cleanTitle = firstHalf;
+    }
+    const mid = Math.floor(cleanTitle.length / 2);
+    if (cleanTitle.length > 4 && cleanTitle.slice(0, mid) === cleanTitle.slice(mid)) {
+      cleanTitle = cleanTitle.slice(0, mid);
+    }
+    return cleanTitle;
+  };
+
   const handleScrape = async (isLoadMore = false) => {
     setIsProcessing(true);
     setError("");
@@ -841,35 +1264,177 @@ export default function Home() {
       const today = new Date().toISOString().split('T')[0];
       const targetUrl = isLoadMore && nextPageUrl ? nextPageUrl : url;
 
+      // Group site: scrape each board individually with progress
+      if (!isLoadMore && selectedGroupSite && selectedGroupSite.boards && selectedGroupSite.boards.length > 0) {
+        const enabledBoards = selectedGroupSite.boards.filter(b => b.enabled);
+        if (enabledBoards.length === 0) {
+          setError('활성화된 게시판이 없습니다.');
+          setIsProcessing(false);
+          return;
+        }
+
+        // Initialize progress
+        scrapeAbortRef.current = false;
+        scrapeAbortControllerRef.current = new AbortController();
+        const initialProgress: BoardScrapeProgress[] = enabledBoards.map(b => ({
+          boardName: `${selectedGroupSite.name}/${b.name}`,
+          boardUrl: b.url,
+          status: 'pending' as BoardScrapeStatus,
+          postCount: 0
+        }));
+        setScrapeProgress(initialProgress);
+        setIsScrapeProgressOpen(true);
+
+        const allPosts: ScrapedPost[] = [];
+
+        for (let i = 0; i < enabledBoards.length; i++) {
+          if (scrapeAbortRef.current) break;
+
+          const board = enabledBoards[i];
+
+          // Update status to scraping
+          setScrapeProgress(prev => prev.map((p, idx) =>
+            idx === i ? { ...p, status: 'scraping' as BoardScrapeStatus } : p
+          ));
+
+          try {
+            const res = await fetch('/api/scrape', {
+              method: 'POST',
+              body: JSON.stringify({
+                url: board.url,
+                date: dateStart || today,
+                dateEnd: dateEnd || ''
+              }),
+              signal: scrapeAbortControllerRef.current?.signal
+            });
+            const data = await res.json();
+
+            if (data.error) {
+              setScrapeProgress(prev => prev.map((p, idx) =>
+                idx === i ? { ...p, status: 'error' as BoardScrapeStatus, error: data.error } : p
+              ));
+              continue;
+            }
+
+            const posts = (data.posts || []).map((post: ScrapedPost) => ({
+              ...post,
+              title: cleanPostTitle(post.title),
+              sourceBoard: board.name || new URL(board.url).pathname.split('/').filter(Boolean).pop() || 'unknown'
+            }));
+
+            allPosts.push(...posts);
+
+            // Update progress
+            setScrapeProgress(prev => prev.map((p, idx) =>
+              idx === i ? { ...p, status: 'done' as BoardScrapeStatus, postCount: posts.length } : p
+            ));
+
+            // Update post list in real-time
+            setPostList([...allPosts].sort((a, b) => {
+              const da = new Date(a.date || 0).getTime();
+              const db = new Date(b.date || 0).getTime();
+              return db - da;
+            }));
+
+          } catch (e: any) {
+            if (e.name === 'AbortError' || scrapeAbortRef.current) {
+              setScrapeProgress(prev => prev.map((p, idx) =>
+                idx === i ? { ...p, status: 'error' as BoardScrapeStatus, error: '중단됨' } : p
+              ));
+              break;
+            }
+            setScrapeProgress(prev => prev.map((p, idx) =>
+              idx === i ? { ...p, status: 'error' as BoardScrapeStatus, error: e.message } : p
+            ));
+          }
+        }
+
+        // Mark remaining pending boards as cancelled
+        setScrapeProgress(prev => prev.map(p =>
+          p.status === 'pending' ? { ...p, status: 'error' as BoardScrapeStatus, error: '중단됨' } : p
+        ));
+
+        // Final sort
+        const sortedPosts = [...allPosts].sort((a, b) => {
+          const da = new Date(a.date || 0).getTime();
+          const db = new Date(b.date || 0).getTime();
+          return db - da;
+        });
+        setPostList(sortedPosts);
+        setNextPageUrl(null);
+
+        if (sortedPosts.length === 0) setError('게시물을 찾지 못했습니다.');
+
+        // Auto-classify
+        if (sortedPosts.length > 0 && activeFilterIds.length > 0) {
+          const activeFilters = savedFilters.filter(f => activeFilterIds.includes(f.id));
+          if (activeFilters.length > 0) {
+            classifyPostsWithFilters(sortedPosts, activeFilters);
+          }
+        }
+
+        setIsProcessing(false);
+        return;
+      }
+
+      if (selectedAiSite && !isLoadMore) {
+        scrapeAbortRef.current = false;
+        scrapeAbortControllerRef.current = new AbortController();
+        setScrapeProgress([{
+          boardName: selectedAiSite.name,
+          boardUrl: targetUrl,
+          status: 'scraping',
+          postCount: 0
+        }]);
+        setIsScrapeProgressOpen(true);
+
+        const res = await fetch('/api/search-ai', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            url: targetUrl,
+            prompt: selectedAiSite.prompt || '',
+            topN: selectedAiSite.topN || 10
+          }),
+          signal: scrapeAbortControllerRef.current?.signal
+        });
+        const data = await res.json();
+
+        if (data.error) {
+          setScrapeProgress([{ boardName: selectedAiSite.name, boardUrl: targetUrl, status: 'error', postCount: 0, error: data.error }]);
+          throw new Error(data.error);
+        }
+
+        const cleanedPosts = (data.posts || []).map((post: ScrapedPost) => ({
+          ...post,
+          title: cleanPostTitle(post.title),
+          sourceBoard: selectedAiSite.name
+        }));
+
+        setPostList(cleanedPosts);
+        setScrapeProgress([{ boardName: selectedAiSite.name, boardUrl: targetUrl, status: 'done', postCount: cleanedPosts.length }]);
+        setNextPageUrl(null);
+
+        // Auto-close progress modal after a short delay on success
+        setTimeout(() => setIsScrapeProgressOpen(false), 2000);
+        setIsProcessing(false);
+        return;
+      }
+
+      // Single URL (existing behavior)
+      const scrapeBody: any = { url: targetUrl, date: dateStart || today, dateEnd: dateEnd || '' };
+
       const res = await fetch('/api/scrape', {
         method: 'POST',
-        body: JSON.stringify({ url: targetUrl, date: date || today })
+        body: JSON.stringify(scrapeBody)
       });
       const data = await res.json();
       if (data.error) throw new Error(data.error);
 
-      const cleanedPosts = (data.posts || []).map((post: ScrapedPost) => {
-        let cleanTitle = post.title.trim();
-
-        // 1. Check for "Word Word" pattern
-        const words = cleanTitle.split(/\s+/);
-        if (words.length >= 2 && words.length % 2 === 0) {
-          const half = words.length / 2;
-          const firstHalf = words.slice(0, half).join(' ');
-          const secondHalf = words.slice(half).join(' ');
-          if (firstHalf === secondHalf) {
-            cleanTitle = firstHalf;
-          }
-        }
-
-        // 2. Check for exact string duplication without spaces
-        const mid = Math.floor(cleanTitle.length / 2);
-        if (cleanTitle.length > 4 && cleanTitle.slice(0, mid) === cleanTitle.slice(mid)) {
-          cleanTitle = cleanTitle.slice(0, mid);
-        }
-
-        return { ...post, title: cleanTitle };
-      });
+      const cleanedPosts = (data.posts || []).map((post: ScrapedPost) => ({
+        ...post,
+        title: cleanPostTitle(post.title)
+      }));
 
       if (isLoadMore) {
         setPostList(prev => [...prev, ...cleanedPosts]);
@@ -880,14 +1445,67 @@ export default function Home() {
       setNextPageUrl(data.nextPageUrl || null);
 
       if (cleanedPosts.length === 0 && !isLoadMore) setError("No posts found.");
+
+      // Auto-classify posts with active filters
+      const allPosts = isLoadMore ? [...postList, ...cleanedPosts] : cleanedPosts;
+      if (allPosts.length > 0 && activeFilterIds.length > 0) {
+        const activeFilters = savedFilters.filter(f => activeFilterIds.includes(f.id));
+        if (activeFilters.length > 0) {
+          classifyPostsWithFilters(allPosts, activeFilters);
+        }
+      }
     } catch (e: any) {
-      setError(e.message);
+      if (e.name === 'AbortError' || scrapeAbortRef.current) {
+        setIsScrapeProgressOpen(false);
+      } else {
+        setError(e.message);
+      }
     } finally {
       setIsProcessing(false);
     }
   };
 
+  // Classify posts with AI filters
+  const classifyPostsWithFilters = async (posts: ScrapedPost[], filters: PostFilter[]) => {
+    setIsClassifying(true);
+    try {
+      const res = await fetch('/api/classify-posts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          posts: posts.map(p => ({ title: p.title, content: p.content, date: p.date })),
+          filters
+        })
+      });
+      const data = await res.json();
+      if (data.results && Array.isArray(data.results)) {
+        setPostList(prev => prev.map((post, idx) => {
+          const match = data.results.find((r: any) => r.postIndex === idx);
+          if (match && match.matchedFilterIds.length > 0) {
+            const matched = filters
+              .filter(f => match.matchedFilterIds.includes(f.id))
+              .map(f => {
+                const phraseMatch = match.matchedPhrases?.find((mp: any) => mp.filterId === f.id);
+                return { id: f.id, name: f.name, type: f.type, matchedPhrases: phraseMatch?.phrases || [] };
+              });
+            return { ...post, matchedFilters: matched };
+          }
+          return { ...post, matchedFilters: [] };
+        }));
+      }
+    } catch (err) {
+      console.error('Classification failed:', err);
+    } finally {
+      setIsClassifying(false);
+    }
+  };
+
   const handleSaveProject = async (overwrite: boolean, archiveType: 'pre' | 'snapshot' = 'pre') => {
+    // Prevent duplicate saves from rapid clicks or concurrent auto-save calls
+    if (isSaving) {
+      console.warn("Save already in progress, skipping duplicate call");
+      return;
+    }
     setIsSaving(true);
     setShowSaveOptions(false);
 
@@ -922,7 +1540,16 @@ export default function Home() {
       if (blob) {
         formData.append('video', blob, 'video.webm');
         try {
-          const thumbBlob = await generateThumbnail(blob);
+          let thumbBlob: Blob | null = null;
+          // Priority 1: Thumbnail Studio output (generateSmartThumbnail result)
+          if (thumbnailPreviewUrl) {
+            const studioRes = await fetch(thumbnailPreviewUrl);
+            thumbBlob = studioRes.ok ? await studioRes.blob() : null;
+          }
+          // Priority 2: Auto-capture from video frame
+          if (!thumbBlob) {
+            thumbBlob = await generateThumbnail(blob);
+          }
           if (thumbBlob) formData.append('thumbnail', thumbBlob, 'thumbnail.jpg');
         } catch (e) {
           console.warn("Skipping thumbnail", e);
@@ -966,12 +1593,12 @@ export default function Home() {
             sceneItems,
             settings: {
               visualStyle, dominantColors, voiceStyle, narrationTone, narrationEnabled,
-              subtitleSpeed, audioEnabled, aiDisclosureEnabled, watermarkUrl,
+              subtitleSpeed, audioEnabled, aiDisclosureEnabled, watermarkConfig,
               selectedPlatform, customWidth, customHeight, imageAspectRatio,
               totalDuration, analysisMode, videoPurpose,
               videoPath: fsData.project?.videoPath,
               // New Additions
-              saveMemo, narrationLength, scrapedPost
+              saveMemo, narrationLength, scrapedPost, sourceUrl: url
             },
             archiveType // Pass to API
           })
@@ -1029,6 +1656,34 @@ export default function Home() {
 
 
 
+
+  // --- MULTI-POST SELECT ---
+  const handleMultiSelectGenerate = (posts: ScrapedPost[], selectedIds: Set<number>) => {
+    const selected = posts.filter((_, i) => selectedIds.has(i));
+    if (selected.length === 0) return;
+
+    const combinedTitle = `${selected.length}개 게시물 통합: ${selected[0].title}${selected.length > 1 ? ` 외 ${selected.length - 1}건` : ''}`;
+    const combinedContent = selected
+      .map((p, i) => `[${i + 1}] ${p.title}\n${(p.content || '').trim()}`)
+      .join('\n\n---\n\n');
+
+    const combinedPost: ScrapedPost = {
+      ...selected[0],
+      title: combinedTitle,
+      content: combinedContent,
+      isMultiPost: true,
+      selectedSources: selected.map(p => ({ title: p.title, date: p.date, link: p.link })),
+    };
+
+    setScrapedPost(combinedPost);
+    setProjectTitle(combinedTitle);
+    setAnalysisResult(null);
+    setSceneItems([]);
+    setCurrentProjectId(null);
+    setError('');
+    setSelectedPostIds(new Set());
+  };
+
   const handleSelectPost = (post: ScrapedPost) => {
     // 1. Fix common scraping duplication in title (e.g., "Title Title" or "TitleTitle")
     let cleanTitle = post.title.trim();
@@ -1051,8 +1706,8 @@ export default function Home() {
     }
 
     // 2. Fix content starting with title
-    let cleanContent = post.content.trim();
-    if (cleanContent.toLowerCase().startsWith(cleanTitle.toLowerCase())) {
+    let cleanContent = (post.content || "").trim();
+    if (cleanContent && cleanContent.toLowerCase().startsWith(cleanTitle.toLowerCase())) {
       cleanContent = cleanContent.substring(cleanTitle.length).trim();
       // Also strip any leading separator like ":" or "-"
       cleanContent = cleanContent.replace(/^[ :\-–—]+/, '').trim();
@@ -1176,7 +1831,9 @@ export default function Home() {
           allowImageVariation, // Pass this new setting
           sceneCount,
           narrationLength, // Pass narrationLength
-          customPrompt: customAiPrompt // Pass custom prompt
+          customPrompt: customAiPrompt, // Pass custom prompt
+          isMultiPost: scrapedPost.isMultiPost,
+          multiPostCount: scrapedPost.selectedSources?.length
         })
       });
       const data = await res.json();
@@ -1231,7 +1888,7 @@ export default function Home() {
           subtitleSpeed,
           audioEnabled,
           aiDisclosureEnabled,
-          watermarkUrl,
+          watermarkConfig,
           selectedPlatform,
           customWidth,
           customHeight,
@@ -1710,7 +2367,9 @@ export default function Home() {
       if (s.subtitleSpeed) setSubtitleSpeed(s.subtitleSpeed);
       if (s.audioEnabled !== undefined) setAudioEnabled(s.audioEnabled);
       if (s.aiDisclosureEnabled !== undefined) setAiDisclosureEnabled(s.aiDisclosureEnabled);
-      if (s.watermarkUrl !== undefined) setWatermarkUrl(s.watermarkUrl);
+      // Watermark — migrate legacy watermarkUrl string or restore watermarkConfig object
+      if (s.watermarkConfig) setWatermarkConfig(s.watermarkConfig);
+      else if (s.watermarkUrl) setWatermarkConfig(prev => ({ ...prev, url: s.watermarkUrl }));
       if (s.selectedPlatform) setSelectedPlatform(s.selectedPlatform);
       if (s.customWidth) setCustomWidth(s.customWidth);
       if (s.customHeight) setCustomHeight(s.customHeight);
@@ -1754,7 +2413,9 @@ export default function Home() {
       if (s.subtitleSpeed) setSubtitleSpeed(s.subtitleSpeed);
       if (s.audioEnabled !== undefined) setAudioEnabled(s.audioEnabled);
       if (s.aiDisclosureEnabled !== undefined) setAiDisclosureEnabled(s.aiDisclosureEnabled);
-      if (s.watermarkUrl !== undefined) setWatermarkUrl(s.watermarkUrl);
+      // Watermark — migrate legacy watermarkUrl or restore watermarkConfig
+      if (s.watermarkConfig) setWatermarkConfig(s.watermarkConfig);
+      else if (s.watermarkUrl) setWatermarkConfig(prev => ({ ...prev, url: s.watermarkUrl }));
       if (s.selectedPlatform) setSelectedPlatform(s.selectedPlatform);
       if (s.customWidth) setCustomWidth(s.customWidth);
       if (s.customHeight) setCustomHeight(s.customHeight);
@@ -2065,80 +2726,357 @@ export default function Home() {
                 />
                 <Globe className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
               </div>
-              <div className="w-full md:w-48 relative">
-                <input
-                  type="date"
-                  value={date}
-                  onChange={e => setDate(e.target.value)}
-                  onClick={(e) => {
-                    try {
-                      (e.target as HTMLInputElement).showPicker();
-                    } catch (err) {
-                      console.warn("showPicker not supported", err);
-                    }
-                  }}
-                  className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-xl text-white focus:border-purple-500 outline-none cursor-pointer"
-                />
-                <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
+              <div className="flex items-center gap-2">
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={dateStart}
+                    onChange={e => setDateStart(e.target.value)}
+                    onClick={(e) => {
+                      try {
+                        (e.target as HTMLInputElement).showPicker();
+                      } catch (err) {
+                        console.warn("showPicker not supported", err);
+                      }
+                    }}
+                    className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-xl text-white focus:border-purple-500 outline-none cursor-pointer text-sm"
+                  />
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
+                </div>
+                <span className="text-gray-500 text-lg font-bold">~</span>
+                <div className="relative">
+                  <input
+                    type="date"
+                    value={dateEnd}
+                    onChange={e => setDateEnd(e.target.value)}
+                    onClick={(e) => {
+                      try {
+                        (e.target as HTMLInputElement).showPicker();
+                      } catch (err) {
+                        console.warn("showPicker not supported", err);
+                      }
+                    }}
+                    className="w-full bg-black/40 border border-white/10 p-4 pl-12 rounded-xl text-white focus:border-purple-500 outline-none cursor-pointer text-sm"
+                  />
+                  <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-500 w-5 h-5 pointer-events-none" />
+                </div>
               </div>
             </div>
 
-            <div className="flex justify-between items-start pt-2">
-              {/* Filter UI */}
-              <div className="flex-1 mr-4 bg-black/20 p-3 rounded-xl border border-white/5">
-                <div className="flex flex-wrap gap-3 items-end">
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Period</label>
+            <div className="space-y-3 pt-2">
+              {/* Stage 1: AI 필터 (Full Width) */}
+              {savedFilters.length > 0 && (
+                <div className="bg-black/20 p-3 rounded-xl border border-white/5">
+                  <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center gap-2">
-                      <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
-                      <span className="text-gray-500">~</span>
-                      <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+                      <span className="text-[10px] text-purple-400 font-bold bg-purple-500/20 px-1.5 py-0.5 rounded">1차</span>
+                      <label className="text-[10px] text-gray-500 uppercase font-bold">AI 필터</label>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {isClassifying && (
+                        <span className="flex items-center gap-1 text-[10px] text-purple-400">
+                          <Loader2 className="w-3 h-3 animate-spin" /> Classifying...
+                        </span>
+                      )}
+                      <button
+                        onClick={() => setShowFilterManager(true)}
+                        className="text-[10px] text-gray-400 hover:text-white flex items-center gap-1 transition-colors"
+                      >
+                        <Settings className="w-3 h-3" /> Manage
+                      </button>
                     </div>
                   </div>
-                  <div>
-                    <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Title Search</label>
-                    <input type="text" value={filterTitle} onChange={e => setFilterTitle(e.target.value)} placeholder="Filter by title..." className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 w-32" />
+                  <div className="flex flex-wrap gap-1.5">
+                    {savedFilters.map(f => (
+                      <button
+                        key={f.id}
+                        onClick={() => setActiveFilterIds(prev =>
+                          prev.includes(f.id) ? prev.filter(id => id !== f.id) : [...prev, f.id]
+                        )}
+                        className={clsx(
+                          "px-2 py-0.5 rounded-md text-[10px] font-bold border transition-all",
+                          activeFilterIds.includes(f.id)
+                            ? f.type === 'include'
+                              ? "bg-green-500/20 text-green-300 border-green-500/40"
+                              : "bg-red-500/20 text-red-300 border-red-500/40"
+                            : "bg-white/5 text-gray-500 border-white/10 hover:bg-white/10"
+                        )}
+                        title={f.description}
+                      >
+                        {f.type === 'exclude' ? '❌ ' : ''}{f.name}
+                      </button>
+                    ))}
                   </div>
-                  <div className="pb-1">
-                    <label className="flex items-center gap-2 cursor-pointer select-none">
-                      <input type="checkbox" checked={filterHideExisting} onChange={e => setFilterHideExisting(e.target.checked)} className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-offset-0" />
-                      <span className="text-xs text-gray-300">Hide Existing Projects</span>
-                    </label>
-                  </div>
-
-                  {/* Reset Filters Button */}
-                  {(filterStartDate || filterEndDate || filterTitle || filterHideExisting) && (
-                    <button
-                      onClick={() => {
-                        setFilterStartDate("");
-                        setFilterEndDate("");
-                        setFilterTitle("");
-                        setFilterHideExisting(false);
-                      }}
-                      className="mb-1 p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
-                      title="Reset Filters"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
+                  {postList.length > 0 && postList.some(p => p.matchedFilters && p.matchedFilters.length > 0) && (
+                    <div className="flex items-center gap-3 mt-2">
+                      <label className="flex items-center gap-1.5 cursor-pointer select-none">
+                        <input type="checkbox" checked={filterHideExcluded} onChange={e => setFilterHideExcluded(e.target.checked)} className="w-3 h-3 rounded border-gray-600 bg-gray-700" />
+                        <span className="text-[10px] text-gray-400">Hide Excluded Posts</span>
+                      </label>
+                      <button
+                        onClick={() => {
+                          const activeFilters = savedFilters.filter(f => activeFilterIds.includes(f.id));
+                          if (activeFilters.length > 0 && postList.length > 0) {
+                            classifyPostsWithFilters(postList, activeFilters);
+                          }
+                        }}
+                        disabled={isClassifying || activeFilterIds.length === 0}
+                        className="text-[10px] text-purple-400 hover:text-purple-300 disabled:text-gray-600 flex items-center gap-1 transition-colors"
+                      >
+                        <RefreshCw className={clsx("w-3 h-3", isClassifying && "animate-spin")} /> Re-classify
+                      </button>
+                    </div>
                   )}
                 </div>
-              </div>
+              )}
 
-              <button
-                onClick={() => handleScrape(false)}
-                disabled={isProcessing}
-                className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                {isProcessing ? <Loader2 className="animate-spin" /> : <RefreshCw className="w-5 h-5" />}
-                {isProcessing ? 'Processing...' : 'Analyze Content'}
-              </button>
+              {/* Stage 2: Basic Filters + Analyze Button */}
+              <div className="flex justify-between items-start">
+                <div className="flex-1 mr-4 bg-black/20 p-3 rounded-xl border border-white/5">
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-[10px] text-blue-400 font-bold bg-blue-500/20 px-1.5 py-0.5 rounded">2차</span>
+                    <label className="text-[10px] text-gray-500 uppercase font-bold">기본 필터</label>
+                  </div>
+                  <div className="flex flex-wrap gap-3 items-end">
+                    <div>
+                      <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Period</label>
+                      <div className="flex items-center gap-2">
+                        <input type="date" value={filterStartDate} onChange={e => setFilterStartDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+                        <span className="text-gray-500">~</span>
+                        <input type="date" value={filterEndDate} onChange={e => setFilterEndDate(e.target.value)} className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 [&::-webkit-calendar-picker-indicator]:filter [&::-webkit-calendar-picker-indicator]:invert" />
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-[10px] text-gray-500 uppercase font-bold mb-1">Title Search</label>
+                      <input type="text" value={filterTitle} onChange={e => setFilterTitle(e.target.value)} placeholder="Filter by title..." className="bg-white/5 border border-white/10 rounded-lg px-2 py-1 text-xs text-white outline-none focus:border-purple-500 w-32" />
+                    </div>
+                    <div className="pb-1">
+                      <label className="flex items-center gap-2 cursor-pointer select-none">
+                        <input type="checkbox" checked={filterHideExisting} onChange={e => setFilterHideExisting(e.target.checked)} className="w-3 h-3 rounded border-gray-600 bg-gray-700 text-purple-600 focus:ring-offset-0" />
+                        <span className="text-xs text-gray-300">Hide Existing Projects</span>
+                      </label>
+                    </div>
+
+                    {/* Reset Filters Button */}
+                    {(filterStartDate || filterEndDate || filterTitle || filterHideExisting) && (
+                      <button
+                        onClick={() => {
+                          setFilterStartDate("");
+                          setFilterEndDate("");
+                          setFilterTitle("");
+                          setFilterHideExisting(false);
+                        }}
+                        className="mb-1 p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors"
+                        title="Reset Filters"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => handleScrape(false)}
+                  disabled={isProcessing}
+                  className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 px-8 py-3 rounded-xl font-bold transition-all hover:scale-105 shadow-lg shadow-purple-900/20 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isProcessing ? <Loader2 className="animate-spin" /> : <RefreshCw className="w-5 h-5" />}
+                  {isProcessing ? 'Processing...' : 'Analyze Content'}
+                </button>
+              </div>
             </div>
             {error && (
               <div className="flex items-center gap-2 text-red-400 bg-red-400/10 p-3 rounded-lg text-sm mt-2 animate-in fade-in">
                 <AlertCircle className="w-4 h-4" /> {error}
               </div>
             )}
+            {analysisResult && (
+              <div className="bg-blue-900/20 p-4 rounded-xl border border-blue-500/30 mt-3 animate-in fade-in">
+                <h2 className="text-sm font-bold text-blue-400 flex items-center gap-2"><Sparkles className="w-4 h-4" /> AI Analysis</h2>
+                <p className="text-sm mt-1 text-gray-300">{analysisResult.summary}</p>
+              </div>
+            )}
           </div>
+
+          {/* Filter Manager Modal */}
+          {showFilterManager && (
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={() => setShowFilterManager(false)}>
+              <div className="bg-gray-900 rounded-2xl border border-white/10 w-full max-w-lg max-h-[80vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+                <div className="p-6">
+                  <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-bold text-white">📋 Filter Management</h3>
+                    <button onClick={() => setShowFilterManager(false)} className="text-gray-400 hover:text-white"><X className="w-5 h-5" /></button>
+                  </div>
+
+                  {/* Add New Filter */}
+                  <div className="bg-white/5 rounded-xl p-4 mb-6 border border-white/10">
+                    <h4 className="text-sm font-bold text-gray-300 mb-3">Add New Filter</h4>
+                    <div className="space-y-3">
+                      <div className="flex gap-2">
+                        <input
+                          value={newFilterName}
+                          onChange={e => setNewFilterName(e.target.value)}
+                          placeholder="Filter name..."
+                          className="flex-1 bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                        />
+                        <select
+                          value={newFilterType}
+                          onChange={e => setNewFilterType(e.target.value as 'include' | 'exclude')}
+                          className="bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                        >
+                          <option value="include">✅ Include</option>
+                          <option value="exclude">❌ Exclude</option>
+                        </select>
+                      </div>
+                      <textarea
+                        value={newFilterDesc}
+                        onChange={e => setNewFilterDesc(e.target.value)}
+                        placeholder="Filter criteria description (used by AI for classification)..."
+                        rows={2}
+                        className="w-full bg-black/40 border border-white/10 rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-purple-500 resize-none"
+                      />
+                      <button
+                        onClick={async () => {
+                          if (!newFilterName.trim()) return;
+                          try {
+                            const res = await fetch('/api/filters', {
+                              method: 'POST',
+                              headers: { 'Content-Type': 'application/json' },
+                              body: JSON.stringify({ name: newFilterName, description: newFilterDesc, type: newFilterType })
+                            });
+                            const data = await res.json();
+                            if (data.id) {
+                              const newFilter: PostFilter = { id: data.id, name: data.name, description: data.description, type: data.type };
+                              setSavedFilters(prev => [...prev, newFilter]);
+                              setActiveFilterIds(prev => [...prev, data.id]);
+                              setNewFilterName("");
+                              setNewFilterDesc("");
+                            }
+                          } catch (err) { console.error('Failed to add filter:', err); }
+                        }}
+                        disabled={!newFilterName.trim()}
+                        className="w-full bg-purple-600 hover:bg-purple-500 disabled:bg-gray-700 disabled:text-gray-500 text-white text-sm font-bold py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
+                      >
+                        <Plus className="w-4 h-4" /> Add Filter
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Include Filters */}
+                  <div className="mb-4">
+                    <h4 className="text-xs font-bold text-green-400 uppercase mb-2">✅ Include Filters</h4>
+                    {savedFilters.filter(f => f.type === 'include').length === 0 ? (
+                      <p className="text-xs text-gray-500">No include filters registered.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {savedFilters.filter(f => f.type === 'include').map(f => (
+                          <div key={f.id} className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <input
+                                defaultValue={f.name}
+                                onBlur={async (e) => {
+                                  const val = e.target.value.trim();
+                                  if (val && val !== f.name) {
+                                    try {
+                                      await fetch('/api/filters', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: f.id, name: val }) });
+                                      setSavedFilters(prev => prev.map(x => x.id === f.id ? { ...x, name: val } : x));
+                                    } catch (err) { console.error('Update failed:', err); }
+                                  }
+                                }}
+                                className="flex-1 bg-transparent text-sm font-bold text-green-300 outline-none border-b border-transparent hover:border-green-500/30 focus:border-green-400 transition-colors px-0 py-0.5"
+                              />
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`/api/filters?id=${f.id}`, { method: 'DELETE' });
+                                    setSavedFilters(prev => prev.filter(x => x.id !== f.id));
+                                    setActiveFilterIds(prev => prev.filter(id => id !== f.id));
+                                  } catch (err) { console.error('Delete failed:', err); }
+                                }}
+                                className="ml-2 text-gray-500 hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              defaultValue={f.description}
+                              placeholder="Filter criteria description..."
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim();
+                                if (val !== f.description) {
+                                  try {
+                                    await fetch('/api/filters', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: f.id, description: val }) });
+                                    setSavedFilters(prev => prev.map(x => x.id === f.id ? { ...x, description: val } : x));
+                                  } catch (err) { console.error('Update failed:', err); }
+                                }
+                              }}
+                              className="w-full bg-transparent text-[11px] text-gray-400 outline-none border-b border-transparent hover:border-green-500/20 focus:border-green-400/50 transition-colors px-0 py-0.5"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Exclude Filters */}
+                  <div>
+                    <h4 className="text-xs font-bold text-red-400 uppercase mb-2">❌ Exclude Filters</h4>
+                    {savedFilters.filter(f => f.type === 'exclude').length === 0 ? (
+                      <p className="text-xs text-gray-500">No exclude filters registered.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {savedFilters.filter(f => f.type === 'exclude').map(f => (
+                          <div key={f.id} className="bg-red-500/5 border border-red-500/20 rounded-lg p-3">
+                            <div className="flex items-center justify-between mb-1.5">
+                              <input
+                                defaultValue={f.name}
+                                onBlur={async (e) => {
+                                  const val = e.target.value.trim();
+                                  if (val && val !== f.name) {
+                                    try {
+                                      await fetch('/api/filters', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: f.id, name: val }) });
+                                      setSavedFilters(prev => prev.map(x => x.id === f.id ? { ...x, name: val } : x));
+                                    } catch (err) { console.error('Update failed:', err); }
+                                  }
+                                }}
+                                className="flex-1 bg-transparent text-sm font-bold text-red-300 outline-none border-b border-transparent hover:border-red-500/30 focus:border-red-400 transition-colors px-0 py-0.5"
+                              />
+                              <button
+                                onClick={async () => {
+                                  try {
+                                    await fetch(`/api/filters?id=${f.id}`, { method: 'DELETE' });
+                                    setSavedFilters(prev => prev.filter(x => x.id !== f.id));
+                                    setActiveFilterIds(prev => prev.filter(id => id !== f.id));
+                                  } catch (err) { console.error('Delete failed:', err); }
+                                }}
+                                className="ml-2 text-gray-500 hover:text-red-400 transition-colors"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <input
+                              defaultValue={f.description}
+                              placeholder="Filter criteria description..."
+                              onBlur={async (e) => {
+                                const val = e.target.value.trim();
+                                if (val !== f.description) {
+                                  try {
+                                    await fetch('/api/filters', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: f.id, description: val }) });
+                                    setSavedFilters(prev => prev.map(x => x.id === f.id ? { ...x, description: val } : x));
+                                  } catch (err) { console.error('Update failed:', err); }
+                                }
+                              }}
+                              className="w-full bg-transparent text-[11px] text-gray-400 outline-none border-b border-transparent hover:border-red-500/20 focus:border-red-400/50 transition-colors px-0 py-0.5"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Step 2: Post List */}
           {postList.length > 0 && !scrapedPost && (
@@ -2189,6 +3127,9 @@ export default function Home() {
                   if (exists) return false;
                 }
 
+                // 4. Exclude Filter Hide
+                if (filterHideExcluded && post.matchedFilters?.some(f => f.type === 'exclude')) return false;
+
                 return true;
               }).map((post, idx) => {
                 const today = new Date().toISOString().split('T')[0];
@@ -2209,13 +3150,47 @@ export default function Home() {
                   <div
                     key={idx}
                     className={clsx(
-                      "p-5 rounded-2xl cursor-pointer border transition-all flex items-center justify-between group",
-                      isNew
-                        ? "bg-purple-600/10 border-purple-500/30 hover:bg-purple-600/20 shadow-lg shadow-purple-900/10"
-                        : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20"
+                      "p-5 rounded-2xl border transition-all flex items-center justify-between group relative",
+                      selectedPostIds.has(idx)
+                        ? "bg-indigo-600/15 border-indigo-500/50 shadow-lg shadow-indigo-900/10"
+                        : isNew
+                          ? "bg-purple-600/10 border-purple-500/30 hover:bg-purple-600/20 shadow-lg shadow-purple-900/10"
+                          : "bg-white/5 border-white/5 hover:bg-white/10 hover:border-white/20",
+                      post.matchedFilters?.some(f => f.type === 'exclude') && "opacity-50"
                     )}
-                    onClick={() => handleSelectPost(post)}
+                    onClick={() => {
+                      if (selectedPostIds.size === 0) {
+                        handleSelectPost(post);
+                      } else {
+                        const newSet = new Set(selectedPostIds);
+                        newSet.has(idx) ? newSet.delete(idx) : newSet.add(idx);
+                        setSelectedPostIds(newSet);
+                      }
+                    }}
                   >
+                    {/* Checkbox (always visible when selection active, hover otherwise) */}
+                    <div
+                      className={clsx(
+                        "shrink-0 mr-3 w-5 h-5 rounded border-2 flex items-center justify-center transition-all cursor-pointer",
+                        selectedPostIds.has(idx)
+                          ? "bg-indigo-500 border-indigo-400"
+                          : "border-white/20 bg-transparent group-hover:border-white/50",
+                        selectedPostIds.size === 0 && "opacity-0 group-hover:opacity-100"
+                      )}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        const newSet = new Set(selectedPostIds);
+                        newSet.has(idx) ? newSet.delete(idx) : newSet.add(idx);
+                        setSelectedPostIds(newSet);
+                      }}
+                    >
+                      {selectedPostIds.has(idx) && (
+                        <svg className="w-3 h-3 text-white" viewBox="0 0 12 12" fill="none">
+                          <path d="M2 6l3 3 5-5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                      )}
+                    </div>
+
                     <div className="flex-1 min-w-0 pr-4">
                       <div className="flex items-center gap-3 mb-2">
                         {isNew && (
@@ -2240,6 +3215,31 @@ export default function Home() {
                           <Clock className="w-3.5 h-3.5" />
                           {post.date}
                         </span>
+                        {post.sourceBoard && (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-purple-500/15 text-purple-400 border border-purple-500/20">
+                            📋 {post.sourceBoard}
+                          </span>
+                        )}
+                        {/* Filter Tags - inline with date */}
+                        {post.matchedFilters && post.matchedFilters.length > 0 ? (
+                          post.matchedFilters.map(mf => (
+                            <span
+                              key={mf.id}
+                              className={clsx(
+                                "px-1.5 py-0.5 rounded text-[9px] font-bold",
+                                mf.type === 'include'
+                                  ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                                  : "bg-red-500/20 text-red-300 border border-red-500/30"
+                              )}
+                            >
+                              {mf.type === 'exclude' ? '❌ ' : '✅ '}{mf.name}
+                            </span>
+                          ))
+                        ) : post.matchedFilters && post.matchedFilters.length === 0 ? (
+                          <span className="px-1.5 py-0.5 rounded text-[9px] font-bold bg-white/5 text-gray-500 border border-white/10">
+                            — 필터 없음
+                          </span>
+                        ) : null}
                       </div>
                     </div>
 
@@ -2250,12 +3250,51 @@ export default function Home() {
                       </div>
                     )}
 
-                    <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
-                      <ChevronRight className="w-5 h-5 text-gray-500" />
-                    </div>
+                    {selectedPostIds.size === 0 && (
+                      <div className="ml-4 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ChevronRight className="w-5 h-5 text-gray-500" />
+                      </div>
+                    )}
                   </div>
                 );
               })}
+            </div>
+          )}
+
+          {/* Multi-Post Floating Action Banner */}
+          {selectedPostIds.size >= 2 && !scrapedPost && (
+            <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-gray-900/95 backdrop-blur-md border border-indigo-500/50 rounded-2xl shadow-2xl shadow-indigo-900/30 px-6 py-4 flex items-center gap-6 animate-in slide-in-from-bottom">
+              <div className="flex items-center gap-3">
+                <div className="bg-indigo-500 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold text-sm">
+                  {selectedPostIds.size}
+                </div>
+                <div>
+                  <div className="text-white font-bold text-sm">{selectedPostIds.size}개 게시물 선택됨</div>
+                  <div className="text-gray-400 text-xs">선택한 게시물을 하나의 영상으로 만듭니다</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-3">
+                <button
+                  onClick={() => setSelectedPostIds(new Set())}
+                  className="px-4 py-2 text-xs text-gray-400 hover:text-white border border-white/10 hover:border-white/30 rounded-xl transition-all"
+                >
+                  선택 취소
+                </button>
+                <button
+                  onClick={() => {
+                    const filtered = postList.filter(post => {
+                      if (filterTitle && !post.title.toLowerCase().includes(filterTitle.toLowerCase())) return false;
+                      if (filterHideExcluded && post.matchedFilters?.some(f => f.type === 'exclude')) return false;
+                      return true;
+                    });
+                    handleMultiSelectGenerate(filtered, selectedPostIds);
+                  }}
+                  className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white font-bold text-sm rounded-xl shadow-lg shadow-indigo-900/30 flex items-center gap-2 transition-all hover:scale-105"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  🎬 통합 영상 생성
+                </button>
+              </div>
             </div>
           )}
 
@@ -2326,6 +3365,29 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Source post info */}
+              {scrapedPost && (() => {
+                const matchedSite = sites.find(s => {
+                  if (s.type === 'group' && s.boards) return s.boards.some((b: any) => b.url === url) || s.url === url;
+                  return s.url === url || (url && url.startsWith(s.url.replace(/\/$/, '')));
+                });
+                const matchedBoard = matchedSite?.type === 'group' ? matchedSite.boards?.find((b: any) => b.url === url) : null;
+                const siteLabel = matchedSite ? (matchedBoard ? `${matchedSite.name}/${matchedBoard.name}` : matchedSite.name) : null;
+                return (
+                  <div className="mx-0 mb-4 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-xs space-y-1.5">
+                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">원본 게시물 정보</div>
+                    {siteLabel && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">사이트</span><span className="text-purple-300 font-medium">{siteLabel}</span></div>}
+                    <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">제목</span>
+                      {scrapedPost.link ? (
+                        <a href={scrapedPost.link} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 hover:underline truncate">{scrapedPost.title}</a>
+                      ) : <span className="text-white truncate">{scrapedPost.title}</span>}
+                    </div>
+                    {scrapedPost.date && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">등록일</span><span className="text-gray-300">{scrapedPost.date}</span></div>}
+                    {scrapedPost.link && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">URL</span><a href={scrapedPost.link} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-300 hover:underline truncate">{scrapedPost.link}</a></div>}
+                  </div>
+                );
+              })()}
+
               <div className="bg-black/40 p-6 rounded-xl border border-white/5 space-y-4">
                 <div>
                   <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Title</label>
@@ -2336,6 +3398,29 @@ export default function Home() {
                     className="w-full bg-black/20 border border-white/10 rounded px-3 py-2 text-white font-bold text-lg focus:border-purple-500 outline-none"
                     placeholder="Enter project title..."
                   />
+                  {/* Filter Tags near title */}
+                  {scrapedPost.matchedFilters && scrapedPost.matchedFilters.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {scrapedPost.matchedFilters.map(mf => (
+                        <span
+                          key={mf.id}
+                          className={clsx(
+                            "px-2 py-0.5 rounded text-[10px] font-bold",
+                            mf.type === 'include'
+                              ? "bg-green-500/20 text-green-300 border border-green-500/30"
+                              : "bg-red-500/20 text-red-300 border border-red-500/30"
+                          )}
+                        >
+                          {mf.type === 'exclude' ? '❌ ' : '✅ '}{mf.name}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                  {scrapedPost.matchedFilters && scrapedPost.matchedFilters.length === 0 && (
+                    <div className="mt-2">
+                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-white/5 text-gray-500 border border-white/10">— 필터 없음</span>
+                    </div>
+                  )}
                 </div>
 
                 <div>
@@ -2537,13 +3622,110 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="text-xs font-bold text-gray-500 uppercase mb-1 block">Full Content (Editable)</label>
-                <textarea
-                  value={scrapedPost.content}
-                  onChange={(e) => setScrapedPost(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
-                  className="w-full text-gray-300 text-sm leading-relaxed whitespace-pre-wrap h-80 overflow-y-auto custom-scrollbar p-3 bg-white/5 rounded-lg border border-white/5 focus:border-purple-500 focus:bg-white/10 outline-none transition-all resize-y"
-                  placeholder="Content text..."
-                />
+                <div className="flex items-center justify-between mb-1">
+                  <label className="text-xs font-bold text-gray-500 uppercase block">Full Content</label>
+                  <div className="flex items-center gap-2">
+                    {scrapedPost.matchedFilters && scrapedPost.matchedFilters.some(mf => mf.matchedPhrases && mf.matchedPhrases.length > 0) && (
+                      <span className="text-[9px] text-purple-400">🔍 Highlighted phrases from filter matches</span>
+                    )}
+                  </div>
+                </div>
+                {(() => {
+                  const allPhrases: { phrase: string; type: 'include' | 'exclude'; filterName: string }[] = [];
+                  scrapedPost.matchedFilters?.forEach(mf => {
+                    mf.matchedPhrases?.forEach(phrase => {
+                      if (phrase.trim()) allPhrases.push({ phrase: phrase.trim(), type: mf.type, filterName: mf.name });
+                    });
+                  });
+                  // Sort by length descending to match longer phrases first
+                  allPhrases.sort((a, b) => b.phrase.length - a.phrase.length);
+
+                  if (allPhrases.length === 0 || contentEditMode) {
+                    return (
+                      <div className="relative">
+                        <textarea
+                          value={scrapedPost.content}
+                          onChange={(e) => setScrapedPost(prev => prev ? ({ ...prev, content: e.target.value }) : null)}
+                          className="w-full text-gray-300 text-sm leading-relaxed whitespace-pre-wrap h-80 overflow-y-auto custom-scrollbar p-3 bg-white/5 rounded-lg border border-white/5 focus:border-purple-500 focus:bg-white/10 outline-none transition-all resize-y"
+                          placeholder="Content text..."
+                        />
+                        {allPhrases.length > 0 && (
+                          <button
+                            onClick={() => setContentEditMode(false)}
+                            className="absolute top-2 right-2 text-[10px] text-gray-400 hover:text-white bg-black/60 px-2 py-1 rounded-md border border-white/10 transition-colors"
+                          >
+                            🔍 View Highlights
+                          </button>
+                        )}
+                      </div>
+                    );
+                  }
+
+                  // Build highlighted content
+                  const content = scrapedPost.content || '';
+                  const segments: { text: string; highlight?: { type: 'include' | 'exclude'; filterName: string } }[] = [];
+                  let remaining = content;
+                  let safetyCounter = 0;
+
+                  while (remaining.length > 0 && safetyCounter < 10000) {
+                    safetyCounter++;
+                    let earliestIdx = remaining.length;
+                    let matchedPhrase: typeof allPhrases[0] | null = null;
+
+                    for (const p of allPhrases) {
+                      const idx = remaining.toLowerCase().indexOf(p.phrase.toLowerCase());
+                      if (idx !== -1 && idx < earliestIdx) {
+                        earliestIdx = idx;
+                        matchedPhrase = p;
+                      }
+                    }
+
+                    if (matchedPhrase && earliestIdx < remaining.length) {
+                      if (earliestIdx > 0) {
+                        segments.push({ text: remaining.substring(0, earliestIdx) });
+                      }
+                      segments.push({
+                        text: remaining.substring(earliestIdx, earliestIdx + matchedPhrase.phrase.length),
+                        highlight: { type: matchedPhrase.type, filterName: matchedPhrase.filterName }
+                      });
+                      remaining = remaining.substring(earliestIdx + matchedPhrase.phrase.length);
+                    } else {
+                      segments.push({ text: remaining });
+                      break;
+                    }
+                  }
+
+                  return (
+                    <div className="relative">
+                      <div className="w-full text-gray-300 text-sm leading-relaxed whitespace-pre-wrap h-80 overflow-y-auto custom-scrollbar p-3 bg-white/5 rounded-lg border border-white/5">
+                        {segments.map((seg, i) =>
+                          seg.highlight ? (
+                            <span
+                              key={i}
+                              className={clsx(
+                                "rounded px-0.5",
+                                seg.highlight.type === 'include'
+                                  ? "bg-green-500/30 text-green-200"
+                                  : "bg-red-500/30 text-red-200"
+                              )}
+                              title={`${seg.highlight.type === 'include' ? '✅' : '❌'} ${seg.highlight.filterName}`}
+                            >
+                              {seg.text}
+                            </span>
+                          ) : (
+                            <span key={i}>{seg.text}</span>
+                          )
+                        )}
+                      </div>
+                      <button
+                        onClick={() => setContentEditMode(true)}
+                        className="absolute top-2 right-2 text-[10px] text-gray-400 hover:text-white bg-black/60 px-2 py-1 rounded-md border border-white/10 transition-colors"
+                      >
+                        ✏️ Edit
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* New: Custom AI Prompt Injection */}
@@ -2698,13 +3880,67 @@ export default function Home() {
             </div>
           )}
 
+
           {/* Step 3: Analysis & Scenes */}
           {analysisResult && (
             <div className="space-y-6">
-              <div className="bg-blue-900/20 p-6 rounded border border-blue-500/30">
-                <h2 className="text-xl font-bold text-blue-400 flex items-center gap-2"><Sparkles className="w-5 h-5" /> AI Analysis</h2>
-                <p className="text-sm mt-2">{analysisResult.summary}</p>
-              </div>
+
+              {/* Source post info */}
+              {scrapedPost && (() => {
+                const matchedSite = sites.find(s => {
+                  if (s.type === 'group' && s.boards) return s.boards.some((b: any) => b.url === url) || s.url === url;
+                  return s.url === url || (url && url.startsWith(s.url.replace(/\/$/, '')));
+                });
+                const matchedBoard = matchedSite?.type === 'group' ? matchedSite.boards?.find((b: any) => b.url === url) : null;
+                const siteLabel = matchedSite ? (matchedBoard ? `${matchedSite.name}/${matchedBoard.name}` : matchedSite.name) : null;
+                return (
+                  <div className="mb-4 px-4 py-3 rounded-xl bg-white/[0.03] border border-white/10 text-xs space-y-1.5">
+                    <div className="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-2">원본 게시물 정보</div>
+                    {siteLabel && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">사이트</span><span className="text-purple-300 font-medium">{siteLabel}</span></div>}
+                    <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">제목</span>
+                      {scrapedPost.link ? (
+                        <a href={scrapedPost.link} target="_blank" rel="noopener noreferrer" className="text-blue-300 hover:text-blue-200 hover:underline truncate">{scrapedPost.title}</a>
+                      ) : <span className="text-white truncate">{scrapedPost.title}</span>}
+                    </div>
+                    {scrapedPost.date && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">등록일</span><span className="text-gray-300">{scrapedPost.date}</span></div>}
+                    {scrapedPost.link && <div className="flex gap-2"><span className="text-gray-500 w-16 shrink-0">URL</span><a href={scrapedPost.link} target="_blank" rel="noopener noreferrer" className="text-gray-500 hover:text-gray-300 hover:underline truncate">{scrapedPost.link}</a></div>}
+                  </div>
+                );
+              })()}
+
+              {/* Multi-Post Sources Summary Card */}
+              {scrapedPost?.isMultiPost && scrapedPost.selectedSources && (
+                <div className="mb-4 px-4 py-3 rounded-xl bg-indigo-900/10 border border-indigo-500/30 text-xs">
+                  <div className="text-[10px] font-bold text-indigo-400 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3" /> 통합 게시물 목록 ({scrapedPost.selectedSources.length}개)
+                  </div>
+                  <div className="space-y-2.5">
+                    {scrapedPost.selectedSources.map((src, i) => (
+                      <div key={i} className="flex gap-2 items-start">
+                        <span className="bg-indigo-500/30 text-indigo-300 font-bold rounded px-1.5 py-0.5 text-[10px] shrink-0">{i + 1}</span>
+                        <div className="min-w-0 space-y-0.5">
+                          <span className="text-gray-300 block font-medium">{src.title}</span>
+                          {src.date && <span className="text-gray-500 block">{src.date}</span>}
+                          {src.link && (
+                            <div className="flex gap-1 items-center">
+                              <span className="text-gray-600 shrink-0">URL</span>
+                              <a
+                                href={src.link}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-blue-400 hover:text-blue-300 hover:underline truncate block"
+                                title={src.link}
+                              >
+                                {src.link}
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
 
               {/* Visual Analysis & Colors */}
               {/* AI Usage & Cost Estimation */}
@@ -3619,7 +4855,7 @@ export default function Home() {
                     tickerSpeed={tickerSpeed} // Add Ticker Speed
                     subtitleSpeed={subtitleSpeed}
                     aiDisclosureEnabled={aiDisclosureEnabled}
-                    watermarkUrl={watermarkUrl}
+                    watermarkConfig={watermarkConfig}
                     canvasWidth={selectedPlatform === 'custom' ? customWidth : platformConfigs[selectedPlatform].width}
                     canvasHeight={selectedPlatform === 'custom' ? customHeight : platformConfigs[selectedPlatform].height}
                     subtitleFontSize={subtitleFontSize}
@@ -3723,13 +4959,69 @@ export default function Home() {
                   >
                     <Pencil className="w-4 h-4" /> Edit Settings
                   </button>
-                  <a
-                    href={videoBlobUrl}
-                    download="auto-movie.webm"
-                    className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors flex items-center gap-2"
-                  >
-                    <VideoIcon className="w-5 h-5" /> Download
-                  </a>
+                  <div className="relative">
+                    <button
+                      onClick={() => setShowDownloadMenu(!showDownloadMenu)}
+                      disabled={isConvertingMp4}
+                      className="px-6 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-full transition-colors flex items-center gap-2 disabled:opacity-50"
+                    >
+                      {isConvertingMp4 ? <Loader2 className="w-5 h-5 animate-spin" /> : <VideoIcon className="w-5 h-5" />}
+                      {isConvertingMp4 ? 'Converting...' : 'Download'}
+                      {!isConvertingMp4 && <ChevronDown className="w-4 h-4" />}
+                    </button>
+                    {showDownloadMenu && !isConvertingMp4 && (
+                      <>
+                        <div className="fixed inset-0 z-40" onClick={() => setShowDownloadMenu(false)} />
+                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 min-w-[180px] animate-in fade-in slide-in-from-bottom-2 duration-200">
+                          <a
+                            href={videoBlobUrl!}
+                            download={`${projectTitle || 'auto-movie'}.webm`}
+                            onClick={() => setShowDownloadMenu(false)}
+                            className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors text-white text-sm font-medium"
+                          >
+                            <VideoIcon className="w-4 h-4 text-blue-400" />
+                            <div>
+                              <div>WebM</div>
+                              <div className="text-[10px] text-gray-500">원본 포맷 · 즉시 다운로드</div>
+                            </div>
+                          </a>
+                          <div className="border-t border-white/5" />
+                          <button
+                            onClick={async () => {
+                              setShowDownloadMenu(false);
+                              if (!videoBlobUrl) return;
+                              setIsConvertingMp4(true);
+                              try {
+                                const blob = await (await fetch(videoBlobUrl)).blob();
+                                const formData = new FormData();
+                                formData.append('video', blob, 'video.webm');
+                                const res = await fetch('/api/convert-video', { method: 'POST', body: formData });
+                                if (!res.ok) throw new Error((await res.json()).error || 'Conversion failed');
+                                const mp4Blob = await res.blob();
+                                const url = URL.createObjectURL(mp4Blob);
+                                const a = document.createElement('a');
+                                a.href = url;
+                                a.download = `${projectTitle || 'auto-movie'}.mp4`;
+                                a.click();
+                                URL.revokeObjectURL(url);
+                              } catch (e: any) {
+                                alert('MP4 변환 실패: ' + e.message);
+                              } finally {
+                                setIsConvertingMp4(false);
+                              }
+                            }}
+                            className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors text-white text-sm font-medium text-left"
+                          >
+                            <VideoIcon className="w-4 h-4 text-orange-400" />
+                            <div>
+                              <div>MP4 <span className="text-[10px] text-orange-400 font-normal">(H.264)</span></div>
+                              <div className="text-[10px] text-gray-500">범용 포맷 · 변환 후 다운로드</div>
+                            </div>
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
                   <button
                     onClick={() => handleSaveProject(false)}
                     disabled={isSaving}
@@ -3859,78 +5151,104 @@ export default function Home() {
                     </div>
                   ) : (
                     <div className="space-y-2">
-                      {savedProjects
-                        .sort((a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime())
-                        .map((proj: any) => (
-                          <div key={proj.id} className="bg-white/5 border border-white/5 p-4 rounded-xl flex justify-between items-center group hover:bg-white/10 transition-all">
-                            <div className="flex-1 min-w-0 pr-4">
-                              {editingProjectId === proj.id ? (
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="text"
-                                    value={editTitleValue}
-                                    onChange={(e) => setEditTitleValue(e.target.value)}
-                                    className="bg-black/40 border border-blue-500 rounded px-2 py-1 text-sm text-white focus:outline-none w-full max-w-xs"
-                                    autoFocus
-                                    onKeyDown={(e) => {
-                                      if (e.key === 'Enter') handleUpdateProjectName(proj.id, editTitleValue);
-                                      if (e.key === 'Escape') setEditingProjectId(null);
-                                    }}
-                                  />
-                                  <button onClick={() => handleUpdateProjectName(proj.id, editTitleValue)} className="p-1 text-green-400 hover:text-green-300 bg-green-400/10 rounded"><CheckCircle className="w-4 h-4" /></button>
-                                  <button onClick={() => setEditingProjectId(null)} className="p-1 text-red-400 hover:text-red-300 bg-red-400/10 rounded"><X className="w-4 h-4" /></button>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-2 group/title">
-                                  <div className="text-sm font-bold text-gray-200 truncate" title={proj.name}>
-                                    {proj.name || "Untitled Project"}
+                      {(() => {
+                        // Group by groupTitle (base title without " - N" suffix)
+                        const sortedProjects = [...savedProjects].sort(
+                          (a: any, b: any) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime()
+                        );
+                        const groups: Record<string, any[]> = {};
+                        for (const proj of sortedProjects) {
+                          const p = proj as any;
+                          const key = (p.groupTitle || (p.name || '').replace(/ - \d+$/, '').trim() || 'Untitled Project');
+                          if (!groups[key]) groups[key] = [];
+                          groups[key].push(proj);
+                        }
+                        return Object.entries(groups).map(([groupName, versions]) => {
+                          const latest = versions[0]; // already sorted by date desc
+                          const hasMultiple = versions.length > 1;
+                          const isExpanded = expandedProjectName === groupName;
+                          return (
+                            <div key={groupName} className="bg-white/5 border border-white/5 rounded-xl overflow-hidden">
+                              {/* Primary Row — latest version */}
+                              <div className="p-4 flex justify-between items-center group hover:bg-white/5 transition-all">
+                                <div className="flex-1 min-w-0 pr-3">
+                                  {(() => {
+                                    const sourceUrl = latest.sourceUrl || '';
+                                    const boardName = latest.sourceBoardName || '';
+                                    if (sourceUrl) {
+                                      for (const site of sites) {
+                                        if (site.type === 'group' && site.boards) {
+                                          const board = site.boards.find((b: any) => b.url === sourceUrl);
+                                          if (board) return <div className="text-[9px] text-purple-400/70 truncate mb-0.5">{site.name}/{board.name}</div>;
+                                        }
+                                        if (site.url === sourceUrl) {
+                                          return <div className="text-[9px] text-purple-400/70 truncate mb-0.5">{site.name}{boardName ? `/${boardName}` : ''}</div>;
+                                        }
+                                      }
+                                    }
+                                    return null;
+                                  })()}
+                                  <div className="flex items-center gap-2">
+                                    <div className="text-sm font-bold text-gray-200 truncate" title={groupName}>{groupName}</div>
+                                    {hasMultiple && (
+                                      <button
+                                        onClick={() => setExpandedProjectName(isExpanded ? null : groupName)}
+                                        className={`flex-shrink-0 text-[9px] font-bold px-1.5 py-0.5 rounded-full transition-all ${isExpanded ? 'bg-indigo-500 text-white' : 'bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/40'}`}
+                                        title={isExpanded ? '버전 목록 닫기' : `${versions.length}개 버전 보기`}
+                                      >
+                                        {versions.length}개 버전
+                                      </button>
+                                    )}
                                   </div>
+                                  <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
+                                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" /> {new Date(latest.updatedAt || latest.createdAt).toLocaleString()}</span>
+                                    <span className="font-mono text-gray-600">ID: {latest.id.slice(0, 8)}</span>
+                                  </div>
+                                </div>
+                                <div className="flex items-center gap-2">
                                   <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      setEditingProjectId(proj.id);
-                                      setEditTitleValue(proj.name || "Untitled Project");
-                                    }}
-                                    className="opacity-0 group-hover/title:opacity-100 text-gray-500 hover:text-white transition-opacity"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
+                                    onClick={() => handleFetchHistory(latest.id)}
+                                    className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-all border border-purple-500/20"
+                                    title="View History"
+                                  ><HistoryIcon className="w-4 h-4" /></button>
+                                  <button
+                                    onClick={() => handleLoadProject(latest.id)}
+                                    className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20"
+                                    title="Load Latest Version"
+                                  ><Upload className="w-4 h-4" /></button>
+                                  <button
+                                    onClick={() => handleSoftDeleteProject(latest.id)}
+                                    className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
+                                    title="Delete Latest Version"
+                                  ><Trash2 className="w-4 h-4" /></button>
+                                </div>
+                              </div>
+
+                              {/* Expanded: all versions */}
+                              {isExpanded && hasMultiple && (
+                                <div className="border-t border-white/5 bg-black/20 divide-y divide-white/5">
+                                  {versions.map((v: any, vi: number) => (
+                                    <div key={v.id} className="px-4 py-2.5 flex justify-between items-center hover:bg-white/5 transition-colors">
+                                      <div className="flex-1 min-w-0 pr-3">
+                                        <div className="text-xs text-gray-400 truncate">{v.name || groupName}</div>
+                                        <div className="text-[10px] text-gray-600 flex items-center gap-2 mt-0.5">
+                                          <Clock className="w-2.5 h-2.5" />{new Date(v.updatedAt || v.createdAt).toLocaleString()}
+                                          <span className="font-mono">ID: {v.id.slice(0, 8)}</span>
+                                          {vi === 0 && <span className="text-green-400 font-bold">최신</span>}
+                                        </div>
+                                      </div>
+                                      <div className="flex items-center gap-1.5">
+                                        <button onClick={() => handleLoadProject(v.id)} className="p-1.5 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20" title="불러오기"><Upload className="w-3 h-3" /></button>
+                                        <button onClick={() => handleSoftDeleteProject(v.id)} className="p-1.5 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20" title="삭제"><Trash2 className="w-3 h-3" /></button>
+                                      </div>
+                                    </div>
+                                  ))}
                                 </div>
                               )}
-                              <div className="flex items-center gap-3 mt-1 text-[10px] text-gray-500">
-                                <span className="flex items-center gap-1">
-                                  <Clock className="w-3 h-3" /> {new Date(proj.updatedAt || proj.createdAt).toLocaleString()}
-                                </span>
-                                <span className="font-mono text-gray-600">ID: {proj.id.slice(0, 8)}</span>
-                              </div>
                             </div>
-
-                            {/* Action Buttons Area */}
-                            <div className="flex items-center gap-2">
-                              <button
-                                onClick={() => handleFetchHistory(proj.id)}
-                                className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-all border border-purple-500/20"
-                                title="View History"
-                              >
-                                <HistoryIcon className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleLoadProject(proj.id)}
-                                className="p-2 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-all border border-blue-500/20"
-                                title="Load Project"
-                              >
-                                <Upload className="w-4 h-4" />
-                              </button>
-                              <button
-                                onClick={() => handleSoftDeleteProject(proj.id)}
-                                className="p-2 bg-red-500/10 hover:bg-red-500/20 text-red-400 rounded-lg transition-all border border-red-500/20"
-                                title="Delete Project"
-                              >
-                                <Trash2 className="w-4 h-4" />
-                              </button>
-                            </div>
-                          </div>
-                        ))}
+                          );
+                        });
+                      })()}
                     </div>
                   ))}
               </div>
@@ -3941,7 +5259,7 @@ export default function Home() {
                 </p>
               </div>
             </div>
-          </div>
+          </div >
         )
       }
       {/* Render Settings / Preview Modal */}
@@ -4010,7 +5328,7 @@ export default function Home() {
                         tickerSpeed={tickerSpeed}
                         subtitleSpeed={subtitleSpeed}
                         aiDisclosureEnabled={aiDisclosureEnabled}
-                        watermarkUrl={watermarkUrl}
+                        watermarkConfig={watermarkConfig}
                         canvasWidth={selectedPlatform === 'custom' ? customWidth : platformConfigs[selectedPlatform].width}
                         canvasHeight={selectedPlatform === 'custom' ? customHeight : platformConfigs[selectedPlatform].height}
                         subtitleFontSize={subtitleFontSize}
@@ -4635,7 +5953,7 @@ export default function Home() {
                         </div>
                         <div className="flex items-center gap-2">
                           {aiDisclosureEnabled && <span className="text-[10px] bg-blue-500/20 text-blue-400 px-1.5 py-0.5 rounded">AI INFO</span>}
-                          {watermarkUrl && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded mr-1">LOGO</span>}
+                          {watermarkConfig.url && <span className="text-[10px] bg-purple-500/20 text-purple-400 px-1.5 py-0.5 rounded mr-1">LOGO</span>}
                           <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", expandedSection === 'branding' ? "rotate-180" : "")} />
                         </div>
                       </button>
@@ -4661,24 +5979,28 @@ export default function Home() {
 
                           <div className="h-px bg-white/5" />
 
-                          {/* Watermark Upload */}
-                          <div>
-                            <div className="flex justify-between items-center mb-2">
+                          {/* Watermark / Logo — Full Customization */}
+                          <div className="space-y-3">
+                            <div className="flex justify-between items-center">
                               <div>
                                 <label className="text-xs text-gray-300 font-bold block">Watermark / Logo</label>
-                                <p className="text-[10px] text-gray-500">Overlay your brand logo</p>
+                                <p className="text-[10px] text-gray-500">위치·크기·투명도 조절 가능</p>
                               </div>
-                              {watermarkUrl && (
-                                <button onClick={() => setWatermarkUrl(null)} className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1">
+                              {watermarkConfig.url && (
+                                <button
+                                  onClick={() => setWatermarkConfig(prev => ({ ...prev, url: null }))}
+                                  className="text-xs text-red-400 hover:text-red-300 flex items-center gap-1"
+                                >
                                   <X className="w-3 h-3" /> Remove
                                 </button>
                               )}
                             </div>
 
+                            {/* Upload Button */}
                             <label className="flex items-center gap-2 bg-black/40 border border-white/10 rounded px-3 py-2 cursor-pointer hover:bg-white/5 transition-colors group">
                               {isUploadingWatermark ? <Loader2 className="w-3 h-3 animate-spin text-gray-400" /> : <Upload className="w-3 h-3 text-gray-500 group-hover:text-white" />}
                               <span className="text-xs text-gray-400 group-hover:text-white transition-colors truncate flex-1">
-                                {watermarkUrl ? "Change Logo Image..." : "Upload Logo Image..."}
+                                {watermarkConfig.url ? "Change Logo Image..." : "Upload Logo Image..."}
                               </span>
                               <input
                                 type="file"
@@ -4691,7 +6013,7 @@ export default function Home() {
                                   try {
                                     const reader = new FileReader();
                                     reader.onload = (event) => {
-                                      setWatermarkUrl(event.target?.result as string);
+                                      setWatermarkConfig(prev => ({ ...prev, url: event.target?.result as string }));
                                       setIsUploadingWatermark(false);
                                     };
                                     reader.readAsDataURL(file);
@@ -4703,19 +6025,396 @@ export default function Home() {
                               />
                             </label>
 
-                            {watermarkUrl && (
-                              <div className="mt-2 h-16 w-full bg-black/50 rounded border border-white/10 flex items-center justify-center p-2 relative">
-                                {/* eslint-disable-next-line @next/next/no-img-element */}
-                                <img src={watermarkUrl} className="max-h-full max-w-full object-contain" alt="Watermark Preview" />
-                                <span className="absolute bottom-1 right-2 text-[8px] text-gray-600 font-mono">PREVIEW</span>
+                            {watermarkConfig.url && (<>
+                              {/* ── Preset Position Buttons ── */}
+                              <div>
+                                <label className="text-[10px] text-gray-500 mb-1.5 block font-bold uppercase tracking-wider">프리셋 위치</label>
+                                <div className="grid grid-cols-3 gap-1">
+                                  {([
+                                    { id: 'top-left', label: '↖ 좌상단' },
+                                    { id: 'center', label: '· 중앙' },
+                                    { id: 'top-right', label: '↗ 우상단' },
+                                    { id: 'bottom-left', label: '↙ 좌하단' },
+                                    { id: 'custom', label: '✥ 커스텀' },
+                                    { id: 'bottom-right', label: '↘ 우하단' },
+                                  ] as { id: import('@/types').WatermarkPosition; label: string }[]).map(({ id, label }) => (
+                                    <button
+                                      key={id}
+                                      onClick={() => {
+                                        const presetCoords: Record<string, [number, number]> = {
+                                          'top-left': [0.1, 0.1], 'top-right': [0.9, 0.1],
+                                          'bottom-left': [0.1, 0.9], 'bottom-right': [0.9, 0.9],
+                                          'center': [0.5, 0.5], 'custom': [watermarkConfig.x, watermarkConfig.y],
+                                        };
+                                        const [nx, ny] = presetCoords[id];
+                                        setWatermarkConfig(prev => ({ ...prev, position: id, x: nx, y: ny }));
+                                      }}
+                                      className={`py-1 px-1 rounded text-[9px] font-bold transition-all ${watermarkConfig.position === id ? 'bg-indigo-600 text-white' : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'}`}
+                                    >
+                                      {label}
+                                    </button>
+                                  ))}
+                                </div>
+                              </div>
+
+                              {/* ── Drag Position Picker ── */}
+                              <div>
+                                <label className="text-[10px] text-gray-500 mb-1.5 block font-bold uppercase tracking-wider">위치 조정 (클릭/드래그)</label>
+                                <div
+                                  className="relative w-full rounded border border-white/10 bg-black/50 cursor-crosshair overflow-hidden select-none"
+                                  style={{ paddingBottom: '56.25%' /* 16:9 */ }}
+                                  onMouseDown={(e) => {
+                                    const rect = e.currentTarget.getBoundingClientRect();
+                                    const nx = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                                    const ny = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                                    setWatermarkConfig(prev => ({ ...prev, position: 'custom', x: nx, y: ny }));
+                                    const onMove = (me: MouseEvent) => {
+                                      const nx2 = Math.max(0, Math.min(1, (me.clientX - rect.left) / rect.width));
+                                      const ny2 = Math.max(0, Math.min(1, (me.clientY - rect.top) / rect.height));
+                                      setWatermarkConfig(prev => ({ ...prev, position: 'custom', x: nx2, y: ny2 }));
+                                    };
+                                    const onUp = () => {
+                                      window.removeEventListener('mousemove', onMove);
+                                      window.removeEventListener('mouseup', onUp);
+                                    };
+                                    window.addEventListener('mousemove', onMove);
+                                    window.addEventListener('mouseup', onUp);
+                                  }}
+                                >
+                                  {/* Background grid pattern */}
+                                  <div className="absolute inset-0 opacity-10"
+                                    style={{ backgroundImage: 'repeating-linear-gradient(0deg, #fff 0, #fff 1px, transparent 1px, transparent 25%), repeating-linear-gradient(90deg, #fff 0, #fff 1px, transparent 1px, transparent 25%)', backgroundSize: '25% 25%' }}
+                                  />
+                                  {/* Logo indicator dot */}
+                                  <div
+                                    className="absolute flex flex-col items-center pointer-events-none"
+                                    style={{
+                                      left: `${watermarkConfig.x * 100}%`,
+                                      top: `${watermarkConfig.y * 100}%`,
+                                      transform: 'translate(-50%, -50%)',
+                                    }}
+                                  >
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                      src={watermarkConfig.url}
+                                      alt="wm"
+                                      style={{ width: `${watermarkConfig.size * 100}%`, opacity: watermarkConfig.opacity, maxWidth: 60, minWidth: 20 }}
+                                      className="rounded shadow-lg"
+                                    />
+                                  </div>
+                                  {/* Crosshair target label */}
+                                  <div className="absolute bottom-1 right-1 text-[8px] text-gray-600 font-mono">
+                                    {(watermarkConfig.x * 100).toFixed(0)}%, {(watermarkConfig.y * 100).toFixed(0)}%
+                                  </div>
+                                </div>
+                              </div>
+
+                              {/* ── Size Slider ── */}
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">크기</label>
+                                  <span className="text-[10px] text-indigo-300 font-mono">{Math.round(watermarkConfig.size * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min={5} max={50} step={1}
+                                  value={Math.round(watermarkConfig.size * 100)}
+                                  onChange={(e) => setWatermarkConfig(prev => ({ ...prev, size: Number(e.target.value) / 100 }))}
+                                  className="w-full accent-indigo-500"
+                                />
+                                <div className="flex justify-between text-[9px] text-gray-600 mt-0.5"><span>5%</span><span>50%</span></div>
+                              </div>
+
+                              {/* ── Opacity Slider ── */}
+                              <div>
+                                <div className="flex justify-between items-center mb-1">
+                                  <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">투명도</label>
+                                  <span className="text-[10px] text-indigo-300 font-mono">{Math.round(watermarkConfig.opacity * 100)}%</span>
+                                </div>
+                                <input
+                                  type="range" min={0} max={100} step={1}
+                                  value={Math.round(watermarkConfig.opacity * 100)}
+                                  onChange={(e) => setWatermarkConfig(prev => ({ ...prev, opacity: Number(e.target.value) / 100 }))}
+                                  className="w-full accent-indigo-500"
+                                />
+                                <div className="flex justify-between text-[9px] text-gray-600 mt-0.5"><span>0%</span><span>100%</span></div>
+                              </div>
+                            </>)}
+                          </div>
+
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ── Thumbnail Studio ─────────────────────────────── */}
+                    <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
+                      <button
+                        onClick={() => setShowThumbnailStudio(p => !p)}
+                        className="w-full text-left p-4 flex justify-between items-center bg-black/20 hover:bg-white/5 transition-colors"
+                      >
+                        <div className="flex items-center gap-2 text-sm font-bold text-gray-300">
+                          <ImageIcon className="w-4 h-4 text-yellow-400" /> 썸네일 스튜디오
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] bg-yellow-500/20 text-yellow-400 px-1.5 py-0.5 rounded">AI</span>
+                          <ChevronDown className={clsx("w-4 h-4 transition-transform text-gray-500", showThumbnailStudio ? "rotate-180" : "")} />
+                        </div>
+                      </button>
+
+                      {showThumbnailStudio && (
+                        <div className="p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+
+                          {/* AI 추천 자동 적용 */}
+                          {(analysisResult as any)?.thumbnailSuggestions && (
+                            <button
+                              onClick={() => {
+                                const s = (analysisResult as any).thumbnailSuggestions;
+                                setThumbnailConfig(prev => ({
+                                  ...prev,
+                                  sceneIndex: s.impactfulSceneIndex ?? 0,
+                                  title: s.catchyTitle ?? prev.title,
+                                }));
+                              }}
+                              className="w-full py-2 px-3 rounded-lg bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 text-xs font-bold hover:bg-yellow-500/25 transition-all flex items-center justify-center gap-2"
+                            >
+                              <Sparkles className="w-3 h-3" /> AI 추천 자동 적용
+                            </button>
+                          )}
+
+                          {/* Scene Picker */}
+                          <div>
+                            <label className="text-[10px] text-gray-500 mb-2 block font-bold uppercase tracking-wider">배경 씬 선택</label>
+                            <div className="grid grid-cols-4 gap-1.5">
+                              {sceneItems.filter(s => s.imageUrl).map((s, i) => (
+                                <button
+                                  key={i}
+                                  onClick={() => setThumbnailConfig(prev => ({ ...prev, sceneIndex: i }))}
+                                  className={`relative aspect-video rounded overflow-hidden border-2 transition-all ${thumbnailConfig.sceneIndex === i ? 'border-yellow-400 scale-105' : 'border-transparent hover:border-white/30'}`}
+                                >
+                                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                                  <img src={s.imageUrl!} alt={`씬${i + 1}`} className="w-full h-full object-cover" />
+                                  <span className="absolute bottom-0 left-0 right-0 text-[7px] text-center bg-black/60 text-white py-0.5">씬 {i + 1}</span>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Platform */}
+                          <div>
+                            <label className="text-[10px] text-gray-500 mb-1.5 block font-bold uppercase tracking-wider">플랫폼 비율</label>
+                            <div className="grid grid-cols-2 gap-1">
+                              {(Object.entries(THUMBNAIL_PLATFORMS) as [ThumbnailPlatformKey, typeof THUMBNAIL_PLATFORMS[ThumbnailPlatformKey]][]).map(([key, cfg]) => (
+                                <button
+                                  key={key}
+                                  onClick={() => setThumbnailConfig(prev => ({ ...prev, platform: key }))}
+                                  className={`py-1.5 px-2 rounded text-[9px] font-bold transition-all text-left ${thumbnailConfig.platform === key ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/40' : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white border border-transparent'}`}
+                                >
+                                  <div>{cfg.label}</div>
+                                  <div className="text-[8px] opacity-60">{cfg.w}×{cfg.h}</div>
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Title Input + AI Suggestions */}
+                          <div className="space-y-2">
+                            {/* Label + AI button row */}
+                            <div className="flex justify-between items-center">
+                              <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">오버레이 제목</label>
+                              <button
+                                disabled={isLoadingTitles}
+                                onClick={async () => {
+                                  setIsLoadingTitles(true);
+                                  setShowTitleSuggestions(false);
+                                  try {
+                                    const res = await fetch('/api/generate-titles', {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({
+                                        summary: (analysisResult as any)?.summary || projectTitle,
+                                        sceneTitles: sceneItems.map(s => s.title || s.subtitle).filter(Boolean),
+                                        sceneTexts: sceneItems.map(s => s.text).filter(Boolean),
+                                        videoPurpose,
+                                      }),
+                                    });
+                                    const data = await res.json();
+                                    if (data.titles?.length) {
+                                      setTitleSuggestions(data.titles);
+                                      setShowTitleSuggestions(true);
+                                    }
+                                  } catch (e) {
+                                    console.error('Title gen failed', e);
+                                  }
+                                  setIsLoadingTitles(false);
+                                }}
+                                className="flex items-center gap-1 py-0.5 px-2 rounded text-[9px] font-bold bg-yellow-500/15 border border-yellow-500/30 text-yellow-300 hover:bg-yellow-500/25 disabled:opacity-50 transition-all"
+                              >
+                                {isLoadingTitles
+                                  ? <><Loader2 className="w-2.5 h-2.5 animate-spin" /> 생성 중...</>
+                                  : <><Sparkles className="w-2.5 h-2.5" /> 🤖 AI 추천 10개</>
+                                }
+                              </button>
+                            </div>
+
+                            {/* Text Input */}
+                            <input
+                              type="text"
+                              value={thumbnailConfig.title}
+                              onChange={(e) => setThumbnailConfig(prev => ({ ...prev, title: e.target.value }))}
+                              placeholder="📌 클릭 유도 제목 입력..."
+                              className="w-full bg-black/40 border border-white/10 rounded px-3 py-2 text-xs text-white placeholder-gray-600 focus:border-yellow-500/40 focus:outline-none"
+                            />
+
+                            {/* Suggestion Chips */}
+                            {showTitleSuggestions && titleSuggestions.length > 0 && (
+                              <div className="space-y-1.5">
+                                <div className="flex justify-between items-center">
+                                  <span className="text-[9px] text-gray-500 font-bold uppercase tracking-wider">클릭하여 선택</span>
+                                  <button onClick={() => setShowTitleSuggestions(false)} className="text-[9px] text-gray-600 hover:text-gray-400">
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </div>
+                                <div className="flex flex-col gap-1">
+                                  {titleSuggestions.map((t, i) => (
+                                    <button
+                                      key={i}
+                                      onClick={() => {
+                                        setThumbnailConfig(prev => ({ ...prev, title: t }));
+                                        setShowTitleSuggestions(false);
+                                      }}
+                                      className={`text-left w-full py-1.5 px-2.5 rounded-lg text-xs font-medium transition-all border ${thumbnailConfig.title === t ? 'bg-yellow-500/25 border-yellow-500/50 text-yellow-200' : 'bg-white/5 border-white/5 text-gray-300 hover:bg-white/10 hover:text-white hover:border-white/20'}`}
+                                    >
+                                      <span className="text-[10px] text-gray-600 mr-1.5 font-mono">{i + 1}.</span>{t}
+                                    </button>
+                                  ))}
+                                </div>
                               </div>
                             )}
                           </div>
+
+
+                          {/* Title Style */}
+                          <div>
+                            <label className="text-[10px] text-gray-500 mb-1.5 block font-bold uppercase tracking-wider">텍스트 스타일</label>
+                            <div className="grid grid-cols-2 gap-1">
+                              {([
+                                { id: 'bold_bottom', label: '⬇ Bold Bottom' },
+                                { id: 'gradient_top', label: '⬆ Gradient Top' },
+                                { id: 'center_glow', label: '✦ Center Glow' },
+                                { id: 'minimal', label: '◻ Minimal' },
+                              ] as { id: import('@/types').ThumbnailTitleStyle; label: string }[]).map(({ id, label }) => (
+                                <button key={id}
+                                  onClick={() => setThumbnailConfig(prev => ({ ...prev, titleStyle: id }))}
+                                  className={`py-1 px-2 rounded text-[9px] font-bold transition-all ${thumbnailConfig.titleStyle === id ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-500/40' : 'bg-white/5 text-gray-400 hover:bg-white/10 border border-transparent'}`}
+                                >
+                                  {label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* Sliders Row */}
+                          <div className="grid grid-cols-2 gap-3">
+                            <div>
+                              <div className="flex justify-between mb-1">
+                                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">배경 블러</label>
+                                <span className="text-[10px] text-yellow-300 font-mono">{thumbnailConfig.bgBlur}px</span>
+                              </div>
+                              <input type="range" min={0} max={20} step={1}
+                                value={thumbnailConfig.bgBlur}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, bgBlur: Number(e.target.value) }))}
+                                className="w-full accent-yellow-500"
+                              />
+                            </div>
+                            <div>
+                              <div className="flex justify-between mb-1">
+                                <label className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">어두움</label>
+                                <span className="text-[10px] text-yellow-300 font-mono">{Math.round(thumbnailConfig.overlayDarkness * 100)}%</span>
+                              </div>
+                              <input type="range" min={0} max={90} step={1}
+                                value={Math.round(thumbnailConfig.overlayDarkness * 100)}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, overlayDarkness: Number(e.target.value) / 100 }))}
+                                className="w-full accent-yellow-500"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Color Pickers */}
+                          <div className="flex gap-3">
+                            <div className="flex items-center gap-2">
+                              <label className="text-[10px] text-gray-500 font-bold">텍스트 색</label>
+                              <input type="color" value={thumbnailConfig.textColor}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, textColor: e.target.value }))}
+                                className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                              />
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <label className="text-[10px] text-gray-500 font-bold">테두리 색</label>
+                              <input type="color" value={thumbnailConfig.strokeColor}
+                                onChange={(e) => setThumbnailConfig(prev => ({ ...prev, strokeColor: e.target.value }))}
+                                className="w-6 h-6 rounded cursor-pointer border-0 bg-transparent"
+                              />
+                            </div>
+                          </div>
+
+                          {/* Preview + Actions */}
+                          <div className="space-y-2">
+                            <button
+                              disabled={isGeneratingThumb}
+                              onClick={async () => {
+                                setIsGeneratingThumb(true);
+                                const blob = await generateSmartThumbnail(thumbnailConfig);
+                                if (blob) {
+                                  if (thumbnailPreviewUrl) URL.revokeObjectURL(thumbnailPreviewUrl);
+                                  setThumbnailPreviewUrl(URL.createObjectURL(blob));
+                                }
+                                setIsGeneratingThumb(false);
+                              }}
+                              className="w-full py-2 px-3 rounded-lg bg-yellow-600 hover:bg-yellow-500 disabled:opacity-50 text-black text-xs font-bold transition-all flex items-center justify-center gap-2"
+                            >
+                              {isGeneratingThumb ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
+                              {isGeneratingThumb ? '생성 중...' : '썸네일 미리보기 생성'}
+                            </button>
+
+                            {thumbnailPreviewUrl && (
+                              <div className="space-y-2">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={thumbnailPreviewUrl} alt="Thumbnail Preview"
+                                  className="w-full rounded-lg border border-white/10 shadow-lg"
+                                />
+                                <div className="grid grid-cols-2 gap-2">
+                                  <a
+                                    href={thumbnailPreviewUrl}
+                                    download={`thumbnail_${thumbnailConfig.platform}_${Date.now()}.jpg`}
+                                    className="py-1.5 px-3 rounded-lg bg-white/10 hover:bg-white/20 text-white text-[10px] font-bold transition-all flex items-center justify-center gap-1"
+                                  >
+                                    <FileVideo className="w-3 h-3" /> 다운로드
+                                  </a>
+                                  <button
+                                    onClick={async () => {
+                                      // Save as project thumbnail
+                                      const blob = await generateSmartThumbnail(thumbnailConfig);
+                                      if (!blob || !currentProjectId) return;
+                                      const fd = new FormData();
+                                      fd.append('id', currentProjectId);
+                                      fd.append('thumbnail', blob, 'thumbnail.jpg');
+                                      await fetch('/api/projects/save', { method: 'POST', body: fd });
+                                      alert('프로젝트 썸네일로 저장되었습니다!');
+                                    }}
+                                    className="py-1.5 px-3 rounded-lg bg-yellow-600 hover:bg-yellow-500 text-black text-[10px] font-bold transition-all flex items-center justify-center gap-1"
+                                  >
+                                    <Save className="w-3 h-3" /> 프로젝트 썸네일 저장
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+
                         </div>
                       )}
                     </div>
 
                     {/* 2. Intro / Outro Settings */}
+
                     <div className="bg-white/5 rounded-xl border border-white/5 overflow-hidden">
                       <button
                         onClick={() => setExpandedSection(expandedSection === 'intro' ? null : 'intro')}
@@ -5437,54 +7136,278 @@ export default function Home() {
       {
         isSiteModalOpen && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] w-full max-w-md rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[80vh]">
+            <div className="bg-[#1a1a1a] w-full max-w-lg rounded-2xl border border-white/10 shadow-2xl flex flex-col max-h-[85vh]">
 
               {/* Header */}
               <div className="p-4 border-b border-white/10 flex items-center justify-between">
-                <h3 className="font-bold text-lg text-white">Saved Sites</h3>
-                <button onClick={() => setIsSiteModalOpen(false)} className="p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
+                <h3 className="font-bold text-lg text-white">🌐 사이트 관리</h3>
+                <button onClick={() => { setIsSiteModalOpen(false); setIsAddingSite(false); setDiscoveredBoards([]); setBoardFilterResults([]); setBoardFilterDesc(''); }} className="p-1 hover:bg-white/10 rounded-full text-gray-400 hover:text-white transition-colors">
                   <X className="w-5 h-5" />
                 </button>
               </div>
 
               {/* Content */}
-              <div className="flex-1 overflow-y-auto p-4 space-y-4">
+              <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
 
-                {/* Add New Site Toggle */}
+                {/* Add New Site */}
                 {!isAddingSite ? (
                   <button
                     onClick={() => setIsAddingSite(true)}
                     className="w-full py-3 border border-dashed border-white/20 rounded-xl text-gray-400 hover:text-white hover:border-white/40 hover:bg-white/5 transition-all text-sm flex items-center justify-center gap-2"
                   >
-                    <Plus className="w-4 h-4" /> Register New Site
+                    <Plus className="w-4 h-4" /> 사이트 등록
                   </button>
                 ) : (
                   <div className="bg-white/5 p-4 rounded-xl border border-white/10 space-y-3 animate-in fade-in slide-in-from-top-2">
+                    {/* Type Toggle */}
+                    <div className="flex gap-2">
+                      <button
+                        onClick={() => { setSiteAddType('single'); setDiscoveredBoards([]); setBoardFilterResults([]); }}
+                        className={clsx(
+                          "flex-1 py-2 text-xs font-bold rounded-lg border transition-all",
+                          siteAddType === 'single'
+                            ? "bg-blue-500/20 text-blue-300 border-blue-500/40"
+                            : "bg-white/5 text-gray-500 border-white/10 hover:bg-white/10"
+                        )}
+                      >
+                        📋 개별 게시판
+                      </button>
+                      <button
+                        onClick={() => { setSiteAddType('group'); setDiscoveredBoards([]); setBoardFilterResults([]); }}
+                        className={clsx(
+                          "flex-1 py-2 text-xs font-bold rounded-lg border transition-all",
+                          siteAddType === 'group'
+                            ? "bg-purple-500/20 text-purple-300 border-purple-500/40"
+                            : "bg-white/5 text-gray-500 border-white/10 hover:bg-white/10"
+                        )}
+                      >
+                        🏢 홈페이지 (그룹)
+                      </button>
+                      <button
+                        onClick={() => { setSiteAddType('ai'); setDiscoveredBoards([]); setBoardFilterResults([]); }}
+                        className={clsx(
+                          "flex-1 py-2 text-xs font-bold rounded-lg border transition-all",
+                          siteAddType === 'ai'
+                            ? "bg-amber-500/20 text-amber-300 border-amber-500/40"
+                            : "bg-white/5 text-gray-500 border-white/10 hover:bg-white/10"
+                        )}
+                      >
+                        🏢 홈페이지 (AI)
+                      </button>
+                    </div>
+
                     <input
                       value={newSiteName}
                       onChange={e => setNewSiteName(e.target.value)}
-                      placeholder="Site Name (e.g. Seocho)"
+                      placeholder={siteAddType === 'single' ? "사이트명 (예: 서초구 공지사항)" : "사이트명 (예: 서초구청)"}
                       className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
                       autoFocus
                     />
                     <input
                       value={newSiteUrl}
                       onChange={e => setNewSiteUrl(e.target.value)}
-                      placeholder="Target URL"
+                      placeholder={siteAddType === 'single' ? "게시판 URL" : "홈페이지 대표 URL (예: https://www.seocho.go.kr)"}
                       className="w-full bg-black/40 border border-white/10 p-2 rounded-lg text-sm text-white focus:border-purple-500 outline-none"
                     />
+
+                    {/* AI: Prompt Input */}
+                    {siteAddType === 'ai' && (
+                      <div className="space-y-3 bg-amber-500/5 p-3 rounded-lg border border-amber-500/15">
+                        <div className="space-y-1">
+                          <label className="text-xs font-bold text-amber-400 flex items-center gap-1.5">
+                            <Sparkles className="w-3 h-3" /> AI 검색 프롬프트
+                          </label>
+                          <textarea
+                            value={newAiPrompt}
+                            onChange={e => setNewAiPrompt(e.target.value)}
+                            placeholder="예: 최신 지원사업 현황 및 공고문 5개 찾아줘"
+                            rows={3}
+                            className="w-full bg-black/40 border border-amber-500/20 p-2 rounded-lg text-sm text-white focus:border-amber-500 outline-none resize-none placeholder:text-gray-600"
+                          />
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="text-xs font-bold text-amber-400">검색 개수:</label>
+                          <select
+                            value={newAiTopN}
+                            onChange={e => setNewAiTopN(Number(e.target.value))}
+                            className="bg-black/40 border border-amber-500/20 text-sm text-white rounded-md px-2 py-1 outline-none focus:border-amber-500"
+                          >
+                            {[5, 10, 15, 20].map(n => (
+                              <option key={n} value={n}>{n}개</option>
+                            ))}
+                          </select>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Group: AI Filter + Discover Boards */}
+                    {siteAddType === 'group' && (
+                      <div className="space-y-2">
+                        {/* AI Board Filter — before discovery */}
+                        <div className="bg-amber-500/5 rounded-lg border border-amber-500/15 p-2.5 space-y-2">
+                          <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold">
+                            <Sparkles className="w-3 h-3" /> AI 게시판 필터 (선택사항)
+                          </div>
+                          <div className="flex gap-1.5 items-center">
+                            <input
+                              value={boardFilterDesc}
+                              onChange={e => setBoardFilterDesc(e.target.value)}
+                              placeholder="게시판 성격 (예: 입찰공고, 채용, 행사)"
+                              className="flex-1 bg-black/40 border border-amber-500/20 p-1.5 rounded-lg text-xs text-white focus:border-amber-500 outline-none placeholder:text-gray-600"
+                            />
+                          </div>
+                          {boardFilterDesc.trim() && (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-gray-500 shrink-0">상위</span>
+                              <select
+                                value={boardFilterCount}
+                                onChange={e => setBoardFilterCount(Number(e.target.value))}
+                                className="bg-black/40 border border-white/10 text-xs text-white rounded-md px-2 py-1 outline-none focus:border-amber-500"
+                              >
+                                {[3, 5, 10, 15, 20, 30].map(n => (
+                                  <option key={n} value={n}>{n}개</option>
+                                ))}
+                              </select>
+                              <span className="text-[10px] text-gray-500">게시판 자동 선택</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Discover Button */}
+                        <button
+                          onClick={handleDiscoverBoards}
+                          disabled={isDiscovering || isFilteringBoards || !newSiteUrl.trim()}
+                          className="w-full py-2 text-xs bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded-lg border border-purple-500/30 transition-all disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                        >
+                          {isDiscovering ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> 게시판 탐색 중...</>
+                          ) : isFilteringBoards ? (
+                            <><Loader2 className="w-3 h-3 animate-spin" /> AI 분석 중...</>
+                          ) : (
+                            <><Search className="w-3 h-3" /> 하위 게시판 탐색{boardFilterDesc.trim() ? ' + AI 필터' : ''}</>
+                          )}
+                        </button>
+
+                        {/* Discovered Boards List */}
+                        {discoveredBoards.length > 0 && (
+                          <>
+                            {/* Re-filter button (if boards already discovered and user changes filter) */}
+                            {boardFilterDesc.trim() && discoveredBoards.length > 0 && (
+                              <button
+                                onClick={handleFilterBoards}
+                                disabled={isFilteringBoards}
+                                className="w-full py-1.5 text-[10px] bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 rounded-lg border border-amber-500/20 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                              >
+                                {isFilteringBoards ? (
+                                  <><Loader2 className="w-3 h-3 animate-spin" /> AI 재분석 중...</>
+                                ) : (
+                                  <><Sparkles className="w-3 h-3" /> AI 필터 재적용</>
+                                )}
+                              </button>
+                            )}
+
+                            <div className="bg-black/30 rounded-lg border border-white/5 max-h-52 overflow-y-auto custom-scrollbar">
+                              <div className="p-2 border-b border-white/5 flex items-center justify-between">
+                                <span className="text-[10px] text-gray-400 font-bold">
+                                  {discoveredBoards.length}개 발견 | {selectedBoards.size}개 선택
+                                  {boardFilterResults.length > 0 && (
+                                    <span className="text-amber-400 ml-1">({boardFilterResults.filter(r => r.relevant).length}개 AI 추천)</span>
+                                  )}
+                                </span>
+                                <button
+                                  onClick={() => {
+                                    if (selectedBoards.size === discoveredBoards.length) {
+                                      setSelectedBoards(new Set());
+                                    } else {
+                                      setSelectedBoards(new Set(discoveredBoards.map((_, i) => i)));
+                                    }
+                                  }}
+                                  className="text-[10px] text-purple-400 hover:text-purple-300"
+                                >
+                                  {selectedBoards.size === discoveredBoards.length ? '전체 해제' : '전체 선택'}
+                                </button>
+                              </div>
+                              {discoveredBoards.map((board, i) => {
+                                const filterResult = boardFilterResults.find(r => r.index === i);
+                                const isRelevant = filterResult?.relevant;
+                                const isFiltered = boardFilterResults.length > 0;
+                                const score = filterResult?.score;
+                                return (
+                                  <label
+                                    key={i}
+                                    className={clsx(
+                                      "flex items-center gap-2 px-3 py-1.5 cursor-pointer text-xs transition-all",
+                                      isFiltered && isRelevant && "bg-amber-500/5 hover:bg-amber-500/10",
+                                      isFiltered && !isRelevant && "opacity-40 hover:opacity-60",
+                                      !isFiltered && "hover:bg-white/5"
+                                    )}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={selectedBoards.has(i)}
+                                      onChange={() => {
+                                        setSelectedBoards(prev => {
+                                          const next = new Set(prev);
+                                          if (next.has(i)) next.delete(i);
+                                          else next.add(i);
+                                          return next;
+                                        });
+                                      }}
+                                      className="w-3 h-3 rounded border-gray-600 bg-gray-700 shrink-0"
+                                    />
+                                    <div className="flex-1 min-w-0">
+                                      <div className="flex items-center gap-1.5">
+                                        <a
+                                          href={board.url}
+                                          target="_blank"
+                                          rel="noopener noreferrer"
+                                          onClick={(e) => e.stopPropagation()}
+                                          className={clsx("truncate hover:underline", isFiltered && isRelevant ? "text-amber-200" : "text-white")}
+                                        >{board.name}</a>
+                                        {isFiltered && score != null && (
+                                          <span className={clsx(
+                                            "shrink-0 px-1 py-0.5 text-[8px] font-bold rounded border",
+                                            score >= 70 ? "bg-amber-500/25 text-amber-300 border-amber-500/30" :
+                                              score >= 40 ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" :
+                                                "bg-gray-500/15 text-gray-500 border-gray-500/20"
+                                          )}>{score}점</span>
+                                        )}
+                                      </div>
+                                      <a
+                                        href={board.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="text-gray-600 hover:text-gray-400 truncate text-[10px] hover:underline"
+                                      >{board.url}</a>
+                                      {filterResult?.reason && (
+                                        <div className={clsx("text-[9px] mt-0.5 truncate", isRelevant ? "text-amber-500/70" : "text-gray-600")}>
+                                          💡 {filterResult.reason}
+                                        </div>
+                                      )}
+                                    </div>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
+
                     <div className="flex justify-end gap-2">
                       <button
-                        onClick={() => setIsAddingSite(false)}
+                        onClick={() => { setIsAddingSite(false); setDiscoveredBoards([]); setSiteAddType('single'); }}
                         className="px-3 py-1.5 text-xs text-gray-400 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
                       >
-                        Cancel
+                        취소
                       </button>
                       <button
                         onClick={handleAddSite}
-                        className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium"
+                        disabled={siteAddType === 'group' && selectedBoards.size === 0}
+                        className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded-lg transition-colors font-medium disabled:opacity-40"
                       >
-                        Save Site
+                        저장
                       </button>
                     </div>
                   </div>
@@ -5494,66 +7417,257 @@ export default function Home() {
                 <div className="space-y-2">
                   {sites.length === 0 && !isAddingSite && (
                     <div className="text-center py-8 text-gray-500 text-sm">
-                      No saved sites yet.
+                      등록된 사이트가 없습니다.
                     </div>
                   )}
 
                   {sites.map((site, idx) => (
-                    <div key={site.id || idx} className={clsx(
-                      "group relative border p-3 rounded-xl transition-all",
-                      editingSiteId === site.id ? "bg-white/10 border-purple-500/50" : "bg-white/5 hover:bg-white/10 border-transparent hover:border-white/10 cursor-pointer"
-                    )}
-                      onClick={() => {
-                        if (editingSiteId === site.id) return;
-                        setUrl(site.url);
-                        setIsSiteModalOpen(false);
-                      }}
-                    >
-                      {editingSiteId === site.id ? (
-                        <div className="space-y-2" onClick={e => e.stopPropagation()}>
-                          <input
-                            value={editSiteName}
-                            onChange={e => setEditSiteName(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-sm text-white focus:border-purple-500 outline-none"
-                            placeholder="Site Name"
-                            autoFocus
-                          />
-                          <input
-                            value={editSiteUrl}
-                            onChange={e => setEditSiteUrl(e.target.value)}
-                            className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-xs text-gray-300 focus:border-purple-500 outline-none"
-                            placeholder="URL"
-                          />
-                          <div className="flex justify-end gap-2 pt-1">
-                            <button
-                              onClick={() => setEditingSiteId(null)}
-                              className="px-2 py-1 text-xs text-gray-400 hover:text-white rounded hover:bg-white/10"
-                            >
-                              Cancel
-                            </button>
-                            <button
-                              onClick={handleUpdateSite}
-                              className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
-                            >
-                              Save
-                            </button>
+                    <div key={site.id || idx} className="border rounded-xl transition-all bg-white/5 border-transparent hover:border-white/10">
+                      {/* Site Header Row */}
+                      <div
+                        className={clsx(
+                          "flex items-center p-3 cursor-pointer group",
+                          editingSiteId === site.id && "bg-white/10"
+                        )}
+                        onClick={() => {
+                          if (editingSiteId === site.id) return;
+                          if (site.type === 'group') {
+                            setExpandedSiteId(prev => prev === site.id! ? null : site.id!);
+                          } else {
+                            setUrl(site.url);
+                            setIsSiteModalOpen(false);
+                          }
+                        }}
+                      >
+                        {editingSiteId === site.id ? (
+                          <div className="flex-1 space-y-2" onClick={e => e.stopPropagation()}>
+                            <input
+                              value={editSiteName}
+                              onChange={e => setEditSiteName(e.target.value)}
+                              className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-sm text-white focus:border-purple-500 outline-none"
+                              placeholder="사이트명"
+                              autoFocus
+                            />
+                            <input
+                              value={editSiteUrl}
+                              onChange={e => setEditSiteUrl(e.target.value)}
+                              className="w-full bg-black/40 border border-white/10 p-1.5 rounded text-xs text-gray-300 focus:border-purple-500 outline-none"
+                              placeholder="URL"
+                            />
+
+                            {/* AI site: Edit Prompt and topN */}
+                            {site.type === 'ai' && (
+                              <div className="bg-amber-500/5 p-2 rounded-lg border border-amber-500/15 space-y-2 mt-2">
+                                <div className="space-y-1">
+                                  <label className="text-[10px] font-bold text-amber-500 flex items-center gap-1">
+                                    <Sparkles className="w-3 h-3" /> 프롬프트 수정
+                                  </label>
+                                  <textarea
+                                    value={editAiPrompt}
+                                    onChange={e => setEditAiPrompt(e.target.value)}
+                                    className="w-full bg-black/40 border border-amber-500/20 p-1.5 rounded text-xs text-white focus:border-amber-500 outline-none resize-none"
+                                    rows={2}
+                                  />
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <label className="text-[10px] text-amber-500 font-bold">검색 개수:</label>
+                                  <select
+                                    value={editAiTopN}
+                                    onChange={e => setEditAiTopN(Number(e.target.value))}
+                                    className="bg-black/40 border border-amber-500/20 text-xs text-white rounded outline-none p-1"
+                                  >
+                                    {[5, 10, 15, 20].map(n => <option key={n} value={n}>{n}개</option>)}
+                                  </select>
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Group site: Board Management */}
+                            {site.type === 'group' && site.boards && (
+                              <div className="bg-black/20 rounded-lg border border-white/5 mt-1">
+                                <div className="p-2 text-[10px] text-gray-400 font-bold border-b border-white/5">
+                                  하위 게시판 관리 ({site.boards.length}개)
+                                </div>
+                                {/* Existing boards list */}
+                                <div className="max-h-36 overflow-y-auto custom-scrollbar">
+                                  {site.boards.map(board => (
+                                    <div key={board.id} className="flex items-center gap-2 px-2.5 py-1 border-t border-white/[0.03] text-xs">
+                                      <button
+                                        onClick={() => handleToggleBoardEnabled(board.id, !board.enabled)}
+                                        className={clsx(
+                                          "w-7 h-3.5 rounded-full relative transition-colors shrink-0",
+                                          board.enabled ? "bg-green-500/50" : "bg-gray-700"
+                                        )}
+                                      >
+                                        <div className={clsx(
+                                          "w-2.5 h-2.5 rounded-full bg-white absolute top-0.5 transition-all",
+                                          board.enabled ? "left-3.5" : "left-0.5"
+                                        )} />
+                                      </button>
+                                      <a
+                                        href={board.url}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className={clsx(
+                                          "flex-1 truncate hover:underline",
+                                          board.enabled ? "text-white" : "text-gray-600 line-through"
+                                        )}
+                                      >{board.name}</a>
+                                      <button
+                                        onClick={() => handleDeleteBoard(board.id)}
+                                        className="p-0.5 text-gray-600 hover:text-red-400 transition-colors shrink-0"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                {/* AI Board Filter for Edit Mode */}
+                                <div className="p-2 border-t border-white/5 space-y-1.5">
+                                  <div className="bg-amber-500/5 rounded-lg border border-amber-500/15 p-2 space-y-1.5">
+                                    <div className="flex items-center gap-1.5 text-[9px] text-amber-400 font-bold">
+                                      <Sparkles className="w-3 h-3" /> AI 게시판 필터 (선택사항)
+                                    </div>
+                                    <input
+                                      value={boardFilterDesc}
+                                      onChange={e => setBoardFilterDesc(e.target.value)}
+                                      placeholder="게시판 성격 (예: 입찰공고, 채용, 행사)"
+                                      className="w-full bg-black/40 border border-amber-500/20 p-1.5 rounded-lg text-[11px] text-white focus:border-amber-500 outline-none placeholder:text-gray-600"
+                                    />
+                                    {boardFilterDesc.trim() && (
+                                      <div className="flex items-center gap-2">
+                                        <span className="text-[9px] text-gray-500 shrink-0">상위</span>
+                                        <select
+                                          value={boardFilterCount}
+                                          onChange={e => setBoardFilterCount(Number(e.target.value))}
+                                          className="bg-black/40 border border-white/10 text-[10px] text-white rounded-md px-1.5 py-0.5 outline-none focus:border-amber-500"
+                                        >
+                                          {[3, 5, 10, 15, 20, 30].map(n => (
+                                            <option key={n} value={n}>{n}개</option>
+                                          ))}
+                                        </select>
+                                        <span className="text-[9px] text-gray-500">게시판 자동 선택</span>
+                                      </div>
+                                    )}
+                                  </div>
+
+                                  <button
+                                    onClick={() => handleEditDiscoverBoards(editSiteUrl || site.url)}
+                                    disabled={isEditDiscovering}
+                                    className="w-full py-1.5 text-[10px] bg-purple-500/15 hover:bg-purple-500/25 text-purple-400 rounded-lg border border-purple-500/20 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                                  >
+                                    {isEditDiscovering ? (
+                                      <><Loader2 className="w-3 h-3 animate-spin" /> 탐색 중...</>
+                                    ) : (
+                                      <><Search className="w-3 h-3" /> 새 게시판 탐색{boardFilterDesc.trim() ? ' + AI 필터' : ''}</>
+                                    )}
+                                  </button>
+
+                                  {/* Newly discovered boards */}
+                                  {editDiscoveredBoards.length > 0 && (
+                                    <div className="space-y-1.5">
+                                      <div className="text-[10px] text-gray-500">
+                                        {editDiscoveredBoards.length}개 새 게시판 발견 (기존 제외)
+                                      </div>
+                                      <div className="max-h-28 overflow-y-auto custom-scrollbar bg-black/20 rounded-md">
+                                        {editDiscoveredBoards.map((board, i) => (
+                                          <label key={i} className="flex items-center gap-2 px-2 py-1 hover:bg-white/5 cursor-pointer text-[11px]">
+                                            <input
+                                              type="checkbox"
+                                              checked={editSelectedBoards.has(i)}
+                                              onChange={() => {
+                                                setEditSelectedBoards(prev => {
+                                                  const next = new Set(prev);
+                                                  if (next.has(i)) next.delete(i);
+                                                  else next.add(i);
+                                                  return next;
+                                                });
+                                              }}
+                                              className="w-3 h-3 rounded shrink-0"
+                                            />
+                                            <span className="text-white truncate">{board.name}</span>
+                                          </label>
+                                        ))}
+                                      </div>
+                                      <button
+                                        onClick={() => handleAddBoardsToGroup(site.id!)}
+                                        disabled={editSelectedBoards.size === 0}
+                                        className="w-full py-1.5 text-[10px] bg-green-500/15 hover:bg-green-500/25 text-green-400 rounded-lg border border-green-500/20 transition-all disabled:opacity-40 flex items-center justify-center gap-1.5"
+                                      >
+                                        <Plus className="w-3 h-3" /> {editSelectedBoards.size}개 게시판 추가
+                                      </button>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+
+                            <div className="flex justify-end gap-2 pt-1">
+                              <button
+                                onClick={() => { setEditingSiteId(null); setEditDiscoveredBoards([]); }}
+                                className="px-2 py-1 text-xs text-gray-400 hover:text-white rounded hover:bg-white/10"
+                              >
+                                닫기
+                              </button>
+                              <button
+                                onClick={handleUpdateSite}
+                                className="px-3 py-1 text-xs bg-purple-600 hover:bg-purple-700 text-white rounded transition-colors"
+                              >
+                                저장
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      ) : (
-                        <>
-                          <div className="pr-16">
-                            <div className="font-medium text-white mb-0.5">{site.name}</div>
-                            <div className="text-xs text-gray-500 truncate">{site.url}</div>
-                          </div>
-                          {site.id && (
-                            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex gap-1 opacity-0 group-hover:opacity-100 transition-all bg-[#2a2a2a] rounded-lg shadow-xl p-1 border border-white/5">
+                        ) : (
+                          <>
+                            <div className="flex-1 min-w-0 pr-4">
+                              <div className="flex items-center gap-2">
+                                <span className={clsx(
+                                  "text-[9px] font-bold px-1.5 py-0.5 rounded shrink-0",
+                                  site.type === 'group'
+                                    ? "bg-purple-500/20 text-purple-400 border border-purple-500/30"
+                                    : site.type === 'ai'
+                                      ? "bg-amber-500/20 text-amber-400 border border-amber-500/30"
+                                      : "bg-blue-500/20 text-blue-400 border border-blue-500/30"
+                                )}>
+                                  {site.type === 'group' ? '그룹' : site.type === 'ai' ? 'AI' : '개별'}
+                                </span>
+                                <div className="font-medium text-white truncate">{site.name}</div>
+                              </div>
+                              <div className="text-xs text-gray-500 truncate mt-0.5">{site.url}</div>
+                              {site.type === 'group' && site.boards && (
+                                <div className="text-[10px] text-gray-600 mt-0.5">
+                                  {site.boards.filter(b => b.enabled).length}/{site.boards.length} 게시판 활성
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Action Buttons */}
+                            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                              {site.type === 'group' && (
+                                <button
+                                  onClick={e => {
+                                    e.stopPropagation();
+                                    // Use first enabled board URL as representative or just use the site URL
+                                    const enabledBoards = site.boards?.filter(b => b.enabled) || [];
+                                    if (enabledBoards.length > 0) {
+                                      setUrl(site.url);
+                                      setIsSiteModalOpen(false);
+                                    }
+                                  }}
+                                  className="p-1.5 text-gray-400 hover:text-green-400 hover:bg-white/5 rounded-md transition-colors"
+                                  title="이 사이트로 검색"
+                                >
+                                  <Search className="w-3.5 h-3.5" />
+                                </button>
+                              )}
                               <button
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   handleEditClick(site as any);
                                 }}
                                 className="p-1.5 text-gray-400 hover:text-purple-400 hover:bg-white/5 rounded-md transition-colors"
-                                title="Edit Site"
+                                title="수정"
                               >
                                 <Pencil className="w-3.5 h-3.5" />
                               </button>
@@ -5563,20 +7677,190 @@ export default function Home() {
                                   handleDeleteSite(site.id as string);
                                 }}
                                 className="p-1.5 text-gray-400 hover:text-red-400 hover:bg-white/5 rounded-md transition-colors"
-                                title="Remove Site"
+                                title="삭제"
                               >
                                 <Trash2 className="w-3.5 h-3.5" />
                               </button>
                             </div>
-                          )}
-                        </>
-                      )}
+                          </>
+                        )}
+                      </div>
+
+                      {/* Accordion: Group Site Boards */}
+                      {
+                        site.type === 'group' && expandedSiteId === site.id && editingSiteId !== site.id && site.boards && (
+                          <div className="border-t border-white/5 bg-black/20 rounded-b-xl">
+                            <div className="p-2 text-[10px] text-gray-500 font-bold flex items-center justify-between px-3">
+                              <span>하위 게시판 ({site.boards.length})</span>
+                            </div>
+                            {site.boards.map(board => (
+                              <div
+                                key={board.id}
+                                className="flex items-center gap-2 px-3 py-1.5 hover:bg-white/5 border-t border-white/[0.03]"
+                              >
+                                {/* Enable/Disable Toggle */}
+                                <button
+                                  onClick={() => handleToggleBoardEnabled(board.id, !board.enabled)}
+                                  className={clsx(
+                                    "w-8 h-4 rounded-full relative transition-colors shrink-0",
+                                    board.enabled ? "bg-green-500/50" : "bg-gray-700"
+                                  )}
+                                >
+                                  <div className={clsx(
+                                    "w-3 h-3 rounded-full bg-white absolute top-0.5 transition-all",
+                                    board.enabled ? "left-4" : "left-0.5"
+                                  )} />
+                                </button>
+                                <div className="flex-1 min-w-0">
+                                  <a
+                                    href={board.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className={clsx("text-xs truncate cursor-pointer hover:text-purple-300 hover:underline transition-colors block", board.enabled ? "text-white" : "text-gray-600 line-through")}
+                                  >{board.name}</a>
+                                  <a
+                                    href={board.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-[10px] text-gray-600 hover:text-gray-400 truncate hover:underline block"
+                                  >{board.url}</a>
+                                </div>
+                                <button
+                                  onClick={() => handleDeleteBoard(board.id)}
+                                  className="p-1 text-gray-600 hover:text-red-400 transition-colors shrink-0"
+                                  title="게시판 삭제"
+                                >
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )
+                      }
                     </div>
                   ))}
                 </div>
 
               </div>
 
+            </div>
+          </div>
+        )
+      }
+
+      {/* Group Scrape Progress Modal */}
+      {
+        isScrapeProgressOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="bg-[#1a1a1a] w-full max-w-md rounded-2xl border border-white/10 shadow-2xl">
+              {/* Header */}
+              <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Loader2 className={clsx("w-5 h-5", scrapeProgress.some(p => p.status === 'scraping') ? "animate-spin text-purple-400" : "text-green-400")} />
+                  <h3 className="font-bold text-white">{selectedAiSite ? 'AI 탐색 및 검색 진행' : '그룹 게시판 검색 진행'}</h3>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {scrapeProgress.filter(p => p.status === 'done' || p.status === 'error').length}/{scrapeProgress.length} 완료
+                </div>
+              </div>
+
+              {/* Progress Bar */}
+              <div className="px-4 pt-3">
+                <div className="w-full h-1.5 bg-gray-800 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-gradient-to-r from-purple-500 to-blue-500 rounded-full transition-all duration-500"
+                    style={{ width: `${scrapeProgress.length > 0 ? (scrapeProgress.filter(p => p.status === 'done' || p.status === 'error').length / scrapeProgress.length) * 100 : 0}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Board List */}
+              <div className="p-4 max-h-72 overflow-y-auto custom-scrollbar space-y-1">
+                {scrapeProgress.map((board, i) => (
+                  <div
+                    key={i}
+                    className={clsx(
+                      "flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all",
+                      board.status === 'scraping' && "bg-purple-500/10 border border-purple-500/20",
+                      board.status === 'done' && "bg-green-500/5",
+                      board.status === 'error' && "bg-red-500/5",
+                      board.status === 'pending' && "opacity-40"
+                    )}
+                  >
+                    {/* Status Icon */}
+                    <div className="shrink-0 w-5 h-5 flex items-center justify-center">
+                      {board.status === 'pending' && (
+                        <div className="w-2 h-2 rounded-full bg-gray-600" />
+                      )}
+                      {board.status === 'scraping' && (
+                        <Loader2 className="w-4 h-4 animate-spin text-purple-400" />
+                      )}
+                      {board.status === 'done' && (
+                        <CheckCircle2 className="w-4 h-4 text-green-400" />
+                      )}
+                      {board.status === 'error' && (
+                        <XCircle className="w-4 h-4 text-red-400" />
+                      )}
+                    </div>
+
+                    {/* Board Name */}
+                    <div className="flex-1 min-w-0">
+                      <div className={clsx(
+                        "truncate text-xs font-medium",
+                        board.status === 'scraping' ? "text-purple-300" :
+                          board.status === 'done' ? "text-white" :
+                            board.status === 'error' ? "text-red-300" :
+                              "text-gray-500"
+                      )}>
+                        {board.boardName}
+                      </div>
+                      {board.status === 'error' && board.error && (
+                        <div className="text-[10px] text-red-500/70 truncate">{board.error}</div>
+                      )}
+                    </div>
+
+                    {/* Post Count */}
+                    {board.status === 'done' && (
+                      <span className="text-[10px] font-bold text-green-400 shrink-0">
+                        {board.postCount}건
+                      </span>
+                    )}
+                    {board.status === 'scraping' && (
+                      <span className="text-[10px] text-purple-400/70 shrink-0 animate-pulse">
+                        검색 중...
+                      </span>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              {/* Footer */}
+              <div className="p-4 border-t border-white/10 flex items-center justify-between">
+                <div className="text-xs text-gray-400">
+                  총 <span className="text-white font-bold">{scrapeProgress.reduce((sum, p) => sum + p.postCount, 0)}</span>건 발견
+                </div>
+                <div className="flex gap-2">
+                  {scrapeProgress.some(p => p.status === 'scraping' || p.status === 'pending') ? (
+                    <button
+                      onClick={() => {
+                        scrapeAbortRef.current = true;
+                        scrapeAbortControllerRef.current?.abort();
+                        setIsScrapeProgressOpen(false);
+                      }}
+                      className="px-4 py-2 text-xs bg-red-500/20 hover:bg-red-500/30 text-red-400 rounded-lg border border-red-500/30 transition-all"
+                    >
+                      중단
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => setIsScrapeProgressOpen(false)}
+                      className="px-4 py-2 text-xs bg-purple-600/30 hover:bg-purple-600/50 text-purple-300 rounded-lg border border-purple-500/30 transition-all"
+                    >
+                      닫기
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
         )

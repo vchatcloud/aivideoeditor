@@ -89,7 +89,8 @@ interface WebGPURendererProps {
     tickerSpeed?: number; // New Prop for Ticker Speed
     subtitleSpeed?: number; // Legacy, can still be used if needed or ignored
     aiDisclosureEnabled?: boolean;
-    watermarkUrl?: string | null;
+    watermarkUrl?: string | null;    // legacy — kept for compat
+    watermarkConfig?: import('@/types').WatermarkConfig; // new — takes priority
     canvasWidth?: number;
     canvasHeight?: number;
     subtitleFontSize?: number;
@@ -186,6 +187,7 @@ export default function WebGPURenderer({
 
     aiDisclosureEnabled = false,
     watermarkUrl = null,
+    watermarkConfig,
     canvasWidth = 1280,
     canvasHeight = 720,
     subtitleFontSize = 50,
@@ -699,9 +701,11 @@ export default function WebGPURenderer({
 
                 // Load Watermark
                 let watermarkBitmap: ImageBitmap | null = null;
-                if (watermarkUrl) {
+                // Resolve effective watermark URL from config or legacy prop
+                const effectiveWatermarkUrl = watermarkConfig?.url ?? watermarkUrl;
+                if (effectiveWatermarkUrl) {
                     try {
-                        watermarkBitmap = await loadBitmap(watermarkUrl);
+                        watermarkBitmap = await loadBitmap(effectiveWatermarkUrl);
                     } catch (e) {
                         console.warn("Failed to load watermark", e);
                     }
@@ -2252,28 +2256,43 @@ export default function WebGPURenderer({
 
                             // ... inside drawFrame ...
 
-                            // Draw Watermark if loaded
+                            // Draw Watermark — dynamic position/size/opacity
                             if (watermarkBitmap) {
-                                ctx.globalAlpha = 0.6;
-                                const w = watermarkBitmap.width;
-                                const h = watermarkBitmap.height;
-                                const maxW = 150;
-                                const maxH = 60;
-                                let dw = w;
-                                let dh = h;
+                                // Compute target dimensions
+                                const cfg = watermarkConfig;
+                                const fraction = cfg?.size ?? 0.15;
+                                const opacity = cfg?.opacity ?? 0.8;
+                                const position = cfg?.position ?? 'top-right';
 
-                                if (w > maxW) {
-                                    dw = maxW;
-                                    dh = h * (maxW / w);
-                                }
-                                if (dh > maxH) {
-                                    dh = maxH;
-                                    dw = dw * (maxH / dh);
+                                const wW = canvasW * fraction;
+                                const aspect = watermarkBitmap.width / watermarkBitmap.height;
+                                const wH = wW / aspect;
+                                const margin = canvasW * 0.02;
+
+                                let wx: number;
+                                let wy: number;
+
+                                if (position === 'custom' && cfg) {
+                                    // Centre the logo on the proportional coord
+                                    wx = cfg.x * canvasW - wW / 2;
+                                    wy = cfg.y * canvasH - wH / 2;
+                                } else {
+                                    const PRESETS: Record<string, [number, number]> = {
+                                        'top-left': [margin, margin],
+                                        'top-right': [canvasW - wW - margin, margin],
+                                        'bottom-left': [margin, canvasH - wH - margin],
+                                        'bottom-right': [canvasW - wW - margin, canvasH - wH - margin],
+                                        'center': [(canvasW - wW) / 2, (canvasH - wH) / 2],
+                                    };
+                                    [wx, wy] = PRESETS[position] ?? PRESETS['top-right'];
                                 }
 
-                                ctx.drawImage(watermarkBitmap, canvas.width - dw - 20, 20, dw, dh);
-                                ctx.globalAlpha = 1.0;
+                                ctx.save();
+                                ctx.globalAlpha = opacity;
+                                ctx.drawImage(watermarkBitmap, wx, wy, wW, wH);
+                                ctx.restore();
                             }
+
 
                             // Draw QR Code if loaded (Below Watermark or Top Right if no Watermark)
                             // Draw QR Code if loaded
@@ -2406,7 +2425,7 @@ export default function WebGPURenderer({
 
 
 
-    }, [scenes, audioSrc, audioVolume, onComplete, aiDisclosureEnabled, watermarkUrl, subtitleFontSize, narrationFontSize, previewMode, subtitleColor, narrationColor, subtitleFont, narrationFont, qrCodeUrl, qrCodeSize, qrCodePosition, subtitleEffectStyle, subtitleEffectColor, subtitleEffectParam, subtitleEntranceAnimation, subtitleExitAnimation, narrationSpeed, tickerSpeed, renderId, introMedia, outroMedia, introScale, outroScale, backgroundColor, backgroundUrl, subtitleBackgroundColor, subtitleBackgroundOpacity, narrationBackgroundColor, narrationBackgroundOpacity, captionConfig, subtitleSyncShift, canvasWidth, canvasHeight, narrationEnabled, subtitleOpacity, subtitleStrokeColor, subtitleStrokeWidth, scaleMode, overlayConfig, overlayMediaUrl, onLog, quality]);
+    }, [scenes, audioSrc, audioVolume, onComplete, aiDisclosureEnabled, watermarkUrl, watermarkConfig, subtitleFontSize, narrationFontSize, previewMode, subtitleColor, narrationColor, subtitleFont, narrationFont, qrCodeUrl, qrCodeSize, qrCodePosition, subtitleEffectStyle, subtitleEffectColor, subtitleEffectParam, subtitleEntranceAnimation, subtitleExitAnimation, narrationSpeed, tickerSpeed, renderId, introMedia, outroMedia, introScale, outroScale, backgroundColor, backgroundUrl, subtitleBackgroundColor, subtitleBackgroundOpacity, narrationBackgroundColor, narrationBackgroundOpacity, captionConfig, subtitleSyncShift, canvasWidth, canvasHeight, narrationEnabled, subtitleOpacity, subtitleStrokeColor, subtitleStrokeWidth, scaleMode, overlayConfig, overlayMediaUrl, onLog, quality]);
 
     // Handle Seek (New Effect)
     useEffect(() => {

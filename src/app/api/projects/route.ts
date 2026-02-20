@@ -165,6 +165,26 @@ export async function GET(request: Request) {
 
             const settings = JSON.parse(record.get('Settings') as string || '{}');
 
+            // Resolve actual file paths from settings, then fallback to scanning the fs
+            let resolvedVideoPath: string = settings.videoPath || '';
+            let resolvedThumbnailPath: string = settings.thumbnailPath || '';
+
+            // If still missing, scan public/projects/<id>/ for a video file
+            if (!resolvedVideoPath) {
+                try {
+                    const projectDir = path.join(process.cwd(), 'public', 'projects', record.id);
+                    if (fs.existsSync(projectDir)) {
+                        const files = fs.readdirSync(projectDir);
+                        const videoFile = files.find(f => /\.(webm|mp4|mov)$/i.test(f));
+                        if (videoFile) resolvedVideoPath = `/projects/${record.id}/${videoFile}`;
+                        if (!resolvedThumbnailPath) {
+                            const thumbFile = files.find(f => /thumbnail.*\.(jpg|jpeg|png|webp)$/i.test(f));
+                            if (thumbFile) resolvedThumbnailPath = `/projects/${record.id}/${thumbFile}`;
+                        }
+                    }
+                } catch (_) { }
+            }
+
             return NextResponse.json({
                 id: record.id,
                 name: record.get('Name'),
@@ -177,10 +197,12 @@ export async function GET(request: Request) {
                 uploads: settings.uploads || [],
                 duration: settings.totalDuration || 0,
                 saveMemo: settings.saveMemo || "",
-                videoPath: `/projects/${record.id}/video.webm`,
+                videoPath: resolvedVideoPath,
+                thumbnailPath: resolvedThumbnailPath,
                 usage: settings.usage || {},
                 scenes: JSON.parse(record.get('SceneItems') as string || '[]')
             });
+
         } else {
             // List all projects with creation time
             const records = await base('Projects').select({
@@ -195,12 +217,16 @@ export async function GET(request: Request) {
                 let deleted = false;
                 let saveMemo = ""; // New field
                 let uploads = []; // New field
+                let sourceUrl = ""; // Source board URL
+                let sourceBoardName = ""; // Source board name
                 try {
                     const s = JSON.parse(settingsStr || '{}');
                     lastModified = s.lastModified;
                     deleted = s.deleted || false;
                     saveMemo = s.saveMemo || ""; // Extract memo
                     uploads = s.uploads || []; // Extract uploads
+                    sourceUrl = s.sourceUrl || ""; // Extract source URL
+                    sourceBoardName = s.scrapedPost?.sourceBoard || ""; // Extract board name
                 } catch (e) { }
 
                 return {
@@ -211,6 +237,8 @@ export async function GET(request: Request) {
                     updatedAt: lastModified || (record as any)._rawJson?.createdTime || new Date().toISOString(),
                     saveMemo, // Return memo
                     uploads, // Return uploads
+                    sourceUrl, // Return source URL
+                    sourceBoardName, // Return source board name
                     deleted: deleted
                 };
             });

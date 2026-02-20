@@ -49,3 +49,9 @@ body {
   scrollbar-width: thin;
   scrollbar-color: rgba(255, 255, 255, 0.2) transparent;
 }
+
+/* Narration Audio Generation — Sound Wave Bar Animation */
+@keyframes narration-bar {
+  0%   { transform: scaleY(0.3); opacity: 0.6; }
+  100% { transform: scaleY(1.0); opacity: 1.0; }
+}

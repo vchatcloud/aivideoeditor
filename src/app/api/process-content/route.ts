@@ -8,7 +8,7 @@ const pdfParse = require('pdf-parse-fork');
 
 export async function POST(request: Request) {
     try {
-        const { text, images, imageUrls, pdfUrls, analysisMode, allowImageVariation, selectedStyle, sceneCount, videoPurpose, imageComposition, imageMood, imageInterpretation, narrationLength, customPrompt } = await request.json();
+        const { text, images, imageUrls, pdfUrls, analysisMode, allowImageVariation, selectedStyle, sceneCount, videoPurpose, imageComposition, imageMood, imageInterpretation, narrationLength, customPrompt, isMultiPost, multiPostCount } = await request.json();
 
         // Map analysisMode to purpose for internal logic compatibility
         const structureMode = analysisMode || 'detail'; // Renamed variable to avoid confusion with videoPurpose
@@ -371,6 +371,13 @@ ${imageStylePrompt}
 
 **User Specific Instructions (HIGHEST PRIORITY)**:
 ${customPrompt ? `- ${customPrompt}` : "None"}
+${isMultiPost && multiPostCount ? `
+**MULTI-POST CONTEXT (CRITICAL)**:
+- The content below is a combination of ${multiPostCount} separate posts, each separated by "---".
+- You MUST distribute the scene count roughly equally among the posts (e.g., ${Math.round((sceneCount || 8) / multiPostCount)} scenes per post if ${sceneCount || 8} total scenes).
+- Each post's story must flow naturally into the next. Create a cohesive single video, not a series of disconnected segments.
+- Begin the video with an intro scene that introduces the combined topic.
+` : ""}
 
 Task:
 1. [Image Text Extraction] (CRITICAL):

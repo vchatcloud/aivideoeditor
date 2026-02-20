@@ -46,12 +46,62 @@ const parseDate = (dateStr: string) => {
 
 export async function POST(request: Request) {
     try {
-        const { url, date } = await request.json();
+        const body = await request.json();
+        const { url, urls, date, dateEnd } = body;
+
+        // Multi-URL support: if urls array is provided, scrape each and merge
+        if (urls && Array.isArray(urls) && urls.length > 0) {
+            const allPosts: any[] = [];
+
+            for (const boardInfo of urls) {
+                const boardUrl = typeof boardInfo === 'string' ? boardInfo : boardInfo.url;
+                const boardName = typeof boardInfo === 'string' ? '' : (boardInfo.name || '');
+
+                try {
+                    // Call the single-URL scrape logic internally
+                    const result = await scrapeSingleUrl(boardUrl, date, dateEnd);
+                    // Tag each post with sourceBoard
+                    const taggedPosts = (result.posts || []).map((p: any) => ({
+                        ...p,
+                        sourceBoard: boardName || new URL(boardUrl).pathname.split('/').filter(Boolean).pop() || 'unknown'
+                    }));
+                    allPosts.push(...taggedPosts);
+                } catch (e) {
+                    console.error(`[MultiScrape] Failed to scrape ${boardUrl}:`, e);
+                }
+            }
+
+            // Sort all posts by date descending
+            allPosts.sort((a, b) => {
+                const da = new Date(a.date || 0).getTime();
+                const db = new Date(b.date || 0).getTime();
+                return db - da;
+            });
+
+            return NextResponse.json({
+                posts: allPosts,
+                nextPageUrl: null // No pagination for multi-board scraping
+            });
+        }
+
+        // Single URL (existing behavior)
         if (!url || !date) {
             return NextResponse.json({ error: 'URL and Date are required' }, { status: 400 });
         }
 
+        const result = await scrapeSingleUrl(url, date, dateEnd);
+        return NextResponse.json(result);
+
+    } catch (error) {
+        console.error('Scraping error:', error);
+        return NextResponse.json({ error: 'Failed to scrape' }, { status: 500 });
+    }
+}
+
+async function scrapeSingleUrl(url: string, date: string, dateEnd?: string) {
+    try {
         const targetDate = new Date(date);
+        const targetEndDate = dateEnd ? new Date(dateEnd + 'T23:59:59') : null;
         const origin = new URL(url).origin;
 
         // 1. Fetch the list page
@@ -170,12 +220,21 @@ export async function POST(request: Request) {
 
                     console.log(`[DEBUG]   -> Best Candidate: Title="${bestTitle}", Link="${bestLink}"`);
 
-                    if (bestLink && bestTitle && elementDate >= targetDate) {
+                    if (bestLink && bestTitle && elementDate >= targetDate && (!targetEndDate || elementDate <= targetEndDate)) {
                         // Resolve relative URLs first
                         const fullLink = (bestLink as string).startsWith('http') ? (bestLink as string) : new URL(bestLink as string, url).toString();
 
+                        // Skip file download entries (not actual posts)
+                        const lowerTitle = bestTitle.toLowerCase();
+                        const lowerLink = fullLink.toLowerCase();
+                        const FILE_EXTS = ['.hwp', '.pdf', '.xlsx', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.zip', '.rar', '.7z', '.alz', '.egg'];
+                        const isFileTitle = FILE_EXTS.some(ext => lowerTitle.includes(ext)) && /첨부|다운|파일|download/i.test(bestTitle);
+                        const isFileLink = /\/download\/|fileDown|file_down|\/file\/|dwn_file|atchFileDown|atch_file/i.test(lowerLink) || FILE_EXTS.some(ext => lowerLink.endsWith(ext));
+                        if (isFileTitle || isFileLink) {
+                            console.log(`[DEBUG]   -> Skipped (File download): "${bestTitle}"`);
+                        }
                         // Check if already added (by Link OR Title)
-                        if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {
+                        else if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {
                             // Store clean date string (YYYY-MM-DD) instead of raw text
                             const dateString = elementDate.toISOString().split('T')[0];
                             console.log(`[DEBUG]   -> ADDING POST: ${bestTitle} (${dateString})`);
@@ -259,9 +318,18 @@ export async function POST(request: Request) {
                                     });
                                 }
 
-                                if (bestLink && bestTitle && elementDate >= targetDate) {
+                                if (bestLink && bestTitle && elementDate >= targetDate && (!targetEndDate || elementDate <= targetEndDate)) {
                                     const fullLink = (bestLink as string).startsWith('http') ? (bestLink as string) : new URL(bestLink as string, url).toString();
-                                    if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {
+
+                                    // Skip file download entries (not actual posts)
+                                    const lowerTitle = bestTitle.toLowerCase();
+                                    const lowerLink = fullLink.toLowerCase();
+                                    const FILE_EXTS = ['.hwp', '.pdf', '.xlsx', '.xls', '.docx', '.doc', '.pptx', '.ppt', '.zip', '.rar', '.7z', '.alz', '.egg'];
+                                    const isFileTitle = FILE_EXTS.some(ext => lowerTitle.includes(ext)) && /첨부|다운|파일|download/i.test(bestTitle);
+                                    const isFileLink = /\/download\/|fileDown|file_down|\/file\/|dwn_file|atchFileDown|atch_file/i.test(lowerLink) || FILE_EXTS.some(ext => lowerLink.endsWith(ext));
+                                    if (isFileTitle || isFileLink) {
+                                        console.log(`[Puppeteer]   -> Skipped (File download): "${bestTitle}"`);
+                                    } else if (!posts.find(p => p.link === fullLink || p.title === bestTitle)) {
                                         const dateString = elementDate.toISOString().split('T')[0];
                                         console.log(`[Puppeteer] ADDING POST: ${bestTitle} (${dateString})`);
                                         posts.push({ title: bestTitle, link: fullLink, date: dateString });
@@ -692,7 +760,42 @@ export async function POST(request: Request) {
                     }
                 });
 
-                // Merge images from files
+                // eGov framework: fn_egov_downFile('FILE_xxx', 'N') JavaScript links
+                // Pattern used by sejong.go.kr and many Korean government sites
+                $$('a[href]').each((_, el) => {
+                    const $el = $$(el);
+                    const href = $el.attr('href') || '';
+                    const name = $el.text().trim();
+
+                    // Match fn_egov_downFile('FILE_ID', 'INDEX') or fn_egov_downFile("FILE_ID", "INDEX")
+                    const egovMatch = href.match(/fn_egov_downFile\s*\(\s*['"]([^'"]+)['"]\s*,\s*['"]?(\d+)['"]?\s*\)/);
+                    if (egovMatch) {
+                        const atchFileId = egovMatch[1];
+                        const fileSn = egovMatch[2];
+                        // Build the standard egov download URL relative to the post's origin
+                        let baseOrigin = '';
+                        try { baseOrigin = new URL(post.link).origin; } catch (e) { return; }
+                        const downloadUrl = `${baseOrigin}/cmm/fms/FileDown.do?atchFileId=${atchFileId}&fileSn=${fileSn}`;
+
+                        // Extract clean filename from link text (e.g. "아이콘기억의_전시관_1.jpg [598.2 KB]")
+                        const fileName = name.replace(/\s*\[[\d.,]+ KB\]/i, '').replace(/\s*\[[\d.,]+ MB\]/i, '').trim() || `attachment_${fileSn}`;
+
+                        // Add to files if not duplicate
+                        if (!files.find(f => f.url === downloadUrl)) {
+                            files.push({ name: fileName, url: downloadUrl });
+                        }
+
+                        // If the filename has an image extension, add to images directly too
+                        const lowerName = fileName.toLowerCase();
+                        if (lowerName.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/)) {
+                            if (!uniqueImages.has(downloadUrl)) {
+                                uniqueImages.add(downloadUrl);
+                            }
+                        }
+                    }
+                });
+
+
                 files.forEach(file => {
                     const lowerUrl = file.url.toLowerCase();
                     if (lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)$/) || lowerUrl.match(/\.(jpg|jpeg|png|gif|webp|bmp)\?/)) {
@@ -746,13 +849,13 @@ export async function POST(request: Request) {
             }
         }
 
-        return NextResponse.json({
+        return {
             posts: detailedPosts,
             nextPageUrl
-        });
+        };
 
     } catch (error) {
         console.error('Scraping error:', error);
-        return NextResponse.json({ error: 'Failed to scrape' }, { status: 500 });
+        return { posts: [], nextPageUrl: null, error: 'Failed to scrape' };
     }
 }

@@ -43,3 +43,8 @@ next-env.d.ts
 # manual screenshots & generated images
 /manual/
 /public/generated/
+/public/uploads/
+/public/projects/
+
+# OAuth tokens (never commit)
+*-tokens.json

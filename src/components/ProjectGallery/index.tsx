@@ -3,8 +3,9 @@ import React, { useState } from 'react';
 import {
     Play, X, Film, FileVideo, VideoIcon, Calendar, Clock,
     FileText, Image as ImageIcon, Music, Pencil, Trash2,
-    Upload, RotateCcw, CheckCircle, ChevronRight
+    Upload, RotateCcw, CheckCircle, ChevronRight, Loader2, Download
 } from 'lucide-react';
+import JSZip from 'jszip';
 
 // ============================================================
 // ProjectGallery — Server Project Gallery + Video Player Modals
@@ -182,6 +183,32 @@ function VideoCard({
     handleDeleteProject: (id: string, e: React.MouseEvent) => void;
     setShowSNSModal: (v: boolean) => void;
 }) {
+    const [showDlMenu, setShowDlMenu] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
+
+    const handleMp4 = async () => {
+        setIsConverting(true);
+        try {
+            const res = await fetch(proj.videoPath);
+            const blob = await res.blob();
+            const fd = new FormData();
+            fd.append('video', blob, 'video.webm');
+            const convertRes = await fetch('/api/convert-video', { method: 'POST', body: fd });
+            if (!convertRes.ok) throw new Error((await convertRes.json()).error || 'Conversion failed');
+            const mp4Blob = await convertRes.blob();
+            const url = URL.createObjectURL(mp4Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${proj.title || 'video'}.mp4`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e: any) {
+            alert('MP4 변환 실패: ' + e.message);
+        } finally {
+            setIsConverting(false);
+        }
+    };
+
     return (
         <div className="group bg-white/5 border border-white/5 rounded-2xl overflow-hidden hover:border-pink-500/50 hover:shadow-2xl hover:shadow-pink-900/20 transition-all duration-300 flex flex-col">
             {/* Video Preview */}
@@ -195,11 +222,14 @@ function VideoCard({
                             const res = await fetch(`/api/projects?id=${proj.projectId}`);
                             if (res.ok) {
                                 const fullData = await res.json();
-                                // Merge: keep gallery data (correct videoPath, thumbnails) + add API data (scenes, uploads, usage)
+                                // Merge: prefer fullData videoPath/thumbnailPath (fs-scanned) over empty gallery values
                                 setSelectedProject((prev: any) => ({
                                     ...prev,
                                     scenes: fullData.scenes || prev?.scenes,
                                     uploads: fullData.uploads || prev?.uploads,
+                                    // Use the resolved path if gallery path is missing
+                                    videoPath: fullData.videoPath || prev?.videoPath || '',
+                                    thumbnailPath: fullData.thumbnailPath || prev?.thumbnailPath || '',
                                 }));
                             }
                         } catch (e) {
@@ -284,13 +314,40 @@ function VideoCard({
                 </div>
 
                 <div className="pt-3 flex gap-2 mt-auto">
-                    <a
-                        href={proj.videoPath}
-                        download={`${proj.title || "project"}.webm`}
-                        className="flex-1 py-2 bg-white/5 hover:bg-white/10 rounded-lg text-center text-xs font-bold text-white transition-colors flex items-center justify-center gap-1"
-                    >
-                        <VideoIcon className="w-3 h-3" /> Download
-                    </a>
+                    <div className="relative flex-1">
+                        <button
+                            onClick={(e) => { e.stopPropagation(); setShowDlMenu(!showDlMenu); }}
+                            disabled={isConverting}
+                            className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-center text-xs font-bold text-white transition-colors flex items-center justify-center gap-1 disabled:opacity-50"
+                        >
+                            {isConverting ? <Loader2 className="w-3 h-3 animate-spin" /> : <VideoIcon className="w-3 h-3" />}
+                            {isConverting ? 'Converting...' : 'Download'}
+                        </button>
+                        {showDlMenu && !isConverting && (
+                            <>
+                                <div className="fixed inset-0 z-40" onClick={(e) => { e.stopPropagation(); setShowDlMenu(false); }} />
+                                <div className="absolute bottom-full left-0 mb-1 bg-gray-900 border border-white/10 rounded-lg shadow-2xl shadow-black/50 overflow-hidden z-50 min-w-[160px]">
+                                    <a
+                                        href={proj.videoPath}
+                                        download={`${proj.title || 'project'}.${(proj.videoPath || '').split('.').pop() || 'webm'}`}
+                                        onClick={(e) => { e.stopPropagation(); setShowDlMenu(false); }}
+                                        className="flex items-center gap-2 px-3 py-2 hover:bg-white/10 transition-colors text-white text-xs font-medium"
+                                    >
+                                        <VideoIcon className="w-3 h-3 text-blue-400" />
+                                        <div><div>WebM</div><div className="text-[9px] text-gray-500">즉시 다운로드</div></div>
+                                    </a>
+                                    <div className="border-t border-white/5" />
+                                    <button
+                                        onClick={(e) => { e.stopPropagation(); setShowDlMenu(false); handleMp4(); }}
+                                        className="w-full flex items-center gap-2 px-3 py-2 hover:bg-white/10 transition-colors text-white text-xs font-medium text-left"
+                                    >
+                                        <VideoIcon className="w-3 h-3 text-orange-400" />
+                                        <div><div>MP4 <span className="text-[9px] text-orange-400">(H.264)</span></div><div className="text-[9px] text-gray-500">변환 후 다운로드</div></div>
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                     <button
                         onClick={(e) => {
                             e.stopPropagation();
@@ -387,18 +444,89 @@ function VideoPlayerModal({
     setPreviewImage: (v: string | null) => void;
     onLoadForEditing: (project: any) => void;
 }) {
+    const [showDlMenu, setShowDlMenu] = useState(false);
+    const [isConverting, setIsConverting] = useState(false);
+    const [isZipping, setIsZipping] = useState(false);
+
+    const handleZipDownload = async () => {
+        if (!project.scenes || project.scenes.length === 0) return;
+        const images = project.scenes
+            .map((s: any, i: number) => ({ url: s.imageUrl, index: i + 1 }))
+            .filter((s: any) => !!s.url);
+        if (images.length === 0) { alert('다운로드 가능한 이미지가 없습니다.'); return; }
+
+        setIsZipping(true);
+        try {
+            const zip = new JSZip();
+            const folder = zip.folder('original_assets')!;
+
+            await Promise.all(images.map(async ({ url, index }: { url: string; index: number }) => {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) return;
+                    const blob = await res.blob();
+                    const ext = url.split('.').pop()?.split('?')[0] || 'jpg';
+                    folder.file(`scene_${String(index).padStart(2, '0')}.${ext}`, blob);
+                } catch (e) {
+                    console.warn(`Failed to fetch image ${index}:`, e);
+                }
+            }));
+
+            const zipBlob = await zip.generateAsync({ type: 'blob' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(zipBlob);
+            a.download = `${(project.title || 'project').replace(/[/\\?%*:|"<>]/g, '_')}_assets.zip`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+        } catch (e: any) {
+            alert('ZIP 생성 실패: ' + e.message);
+        } finally {
+            setIsZipping(false);
+        }
+    };
+
+
+    const handleMp4 = async () => {
+        setIsConverting(true);
+        try {
+            const res = await fetch(project.videoPath);
+            const blob = await res.blob();
+            const fd = new FormData();
+            fd.append('video', blob, 'video.webm');
+            const convertRes = await fetch('/api/convert-video', { method: 'POST', body: fd });
+            if (!convertRes.ok) throw new Error((await convertRes.json()).error || 'Conversion failed');
+            const mp4Blob = await convertRes.blob();
+            const url = URL.createObjectURL(mp4Blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `${project.title || 'video'}.mp4`;
+            a.click();
+            URL.revokeObjectURL(url);
+        } catch (e: any) {
+            alert('MP4 변환 실패: ' + e.message);
+        } finally {
+            setIsConverting(false);
+        }
+    };
     return (
         <div className="fixed inset-0 z-[110] bg-black/95 backdrop-blur-xl flex items-center justify-center p-4 md:p-12 animate-in fade-in duration-300">
             <div className="bg-[#111] border border-white/10 rounded-3xl w-full max-w-7xl h-full max-h-[90vh] flex flex-col md:flex-row overflow-hidden shadow-[0_0_100px_rgba(0,0,0,0.8)]">
 
                 {/* Video Area */}
                 <div className="flex-[2] bg-black relative flex items-center justify-center group/player">
-                    <video
-                        src={project.videoPath}
-                        className="w-full h-full object-contain"
-                        controls
-                        autoPlay
-                    />
+                    {project.videoPath ? (
+                        <video
+                            src={project.videoPath}
+                            className="w-full h-full object-contain"
+                            controls
+                            autoPlay
+                        />
+                    ) : (
+                        <div className="flex flex-col items-center justify-center gap-3 text-gray-600">
+                            <Film className="w-16 h-16 opacity-30" />
+                            <span className="text-sm">영상 파일 없음</span>
+                        </div>
+                    )}
                     <button
                         onClick={onClose}
                         className="absolute top-6 left-6 z-50 p-3 bg-black/40 hover:bg-black/80 text-white rounded-full backdrop-blur-md transition-all border border-white/10 hover:scale-110 md:hidden"
@@ -477,12 +605,67 @@ function VideoPlayerModal({
                             </div>
                         </div>
 
+                        {/* Thumbnail Preview & Download */}
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-2">
+                                <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">썸네일</h4>
+                                <div className="flex-1 h-px bg-white/5"></div>
+                                {project.thumbnailPath && (
+                                    <a
+                                        href={project.thumbnailPath}
+                                        download={`${project.title || 'thumbnail'}_thumb.jpg`}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 bg-yellow-600/20 hover:bg-yellow-600/40 text-yellow-300 hover:text-white border border-yellow-500/30 rounded-lg text-[10px] font-bold transition-all"
+                                        title="썸네일 다운로드"
+                                    >
+                                        <Download className="w-3 h-3" /> 다운로드
+                                    </a>
+                                )}
+                            </div>
+                            {project.thumbnailPath ? (
+                                <div className="relative group rounded-xl overflow-hidden border border-white/10 bg-black/40">
+                                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                                    <img
+                                        src={project.thumbnailPath}
+                                        alt="Project Thumbnail"
+                                        className="w-full object-cover"
+                                    />
+                                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                                        <a
+                                            href={project.thumbnailPath}
+                                            download={`${project.title || 'thumbnail'}_thumb.jpg`}
+                                            className="flex items-center gap-2 px-4 py-2 bg-black/70 hover:bg-yellow-600 text-white text-xs font-bold rounded-full border border-white/20 transition-all"
+                                            onClick={e => e.stopPropagation()}
+                                        >
+                                            <Download className="w-4 h-4" /> 다운로드
+                                        </a>
+                                    </div>
+                                    <div className="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-[9px] font-mono text-white/60 px-1.5 py-0.5 rounded">
+                                        {project.thumbnailPath.split('/').pop()}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-full aspect-video bg-black/40 border border-white/5 rounded-xl flex flex-col items-center justify-center gap-2 text-gray-600">
+                                    <ImageIcon className="w-8 h-8 opacity-30" />
+                                    <span className="text-[10px]">썸네일 없음 — 썸네일 스튜디오에서 생성하세요</span>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Original Assets */}
                         {project.scenes && project.scenes.length > 0 && (
                             <div className="space-y-4">
                                 <div className="flex items-center gap-2">
                                     <h4 className="text-xs font-bold text-gray-400 uppercase tracking-wider">Original Assets</h4>
                                     <div className="flex-1 h-px bg-white/5"></div>
+                                    <button
+                                        onClick={handleZipDownload}
+                                        disabled={isZipping}
+                                        className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-600/20 hover:bg-indigo-600/40 text-indigo-300 hover:text-white border border-indigo-500/30 rounded-lg text-[10px] font-bold transition-all disabled:opacity-50"
+                                        title="모든 이미지를 ZIP으로 다운로드"
+                                    >
+                                        {isZipping ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
+                                        {isZipping ? '압축 중...' : 'ZIP 다운로드'}
+                                    </button>
                                 </div>
                                 <div className="grid grid-cols-2 lg:grid-cols-3 gap-2">
                                     {project.scenes.map((scene: any, idx: number) => {
@@ -514,24 +697,51 @@ function VideoPlayerModal({
                     {/* Actions */}
                     <div className="p-8 bg-black/20 border-t border-white/10">
                         <div className="grid grid-cols-3 gap-4 mb-8">
-                            <a
-                                href={project.videoPath}
-                                download={`${project.title || "video"}.webm`}
-                                className="py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-center font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5"
-                            >
-                                <VideoIcon className="w-4 h-4" /> Download Video
-                            </a>
+                            <div className="relative">
+                                <button
+                                    onClick={() => setShowDlMenu(!showDlMenu)}
+                                    disabled={isConverting}
+                                    className="w-full py-3 bg-white/5 hover:bg-white/10 text-white rounded-xl text-center font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 disabled:opacity-50"
+                                >
+                                    {isConverting ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                                    {isConverting ? 'Converting...' : 'Download Video'}
+                                </button>
+                                {showDlMenu && !isConverting && (
+                                    <>
+                                        <div className="fixed inset-0 z-40" onClick={() => setShowDlMenu(false)} />
+                                        <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-gray-900 border border-white/10 rounded-xl shadow-2xl shadow-black/50 overflow-hidden z-50 min-w-[200px]">
+                                            <a
+                                                href={project.videoPath}
+                                                download={`${project.title || 'video'}.${(project.videoPath || '').split('.').pop() || 'webm'}`}
+                                                onClick={() => setShowDlMenu(false)}
+                                                className="flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors text-white text-sm font-medium"
+                                            >
+                                                <VideoIcon className="w-4 h-4 text-blue-400" />
+                                                <div><div>WebM</div><div className="text-[10px] text-gray-500">원본 포맷 · 즉시 다운로드</div></div>
+                                            </a>
+                                            <div className="border-t border-white/5" />
+                                            <button
+                                                onClick={() => { setShowDlMenu(false); handleMp4(); }}
+                                                className="w-full flex items-center gap-3 px-4 py-3 hover:bg-white/10 transition-colors text-white text-sm font-medium text-left"
+                                            >
+                                                <VideoIcon className="w-4 h-4 text-orange-400" />
+                                                <div><div>MP4 <span className="text-[10px] text-orange-400 font-normal">(H.264)</span></div><div className="text-[10px] text-gray-500">범용 포맷 · 변환 후 다운로드</div></div>
+                                            </button>
+                                        </div>
+                                    </>
+                                )}
+                            </div>
                             <button
                                 onClick={() => setShowSNSModal(true)}
                                 className="py-3 bg-gradient-to-r from-red-600/80 to-cyan-500/80 hover:from-red-600 hover:to-cyan-500 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 border border-white/5 shadow-lg shadow-red-900/20"
                             >
-                                <Upload className="w-4 h-4" /> Upload to SNS
+                                Upload to SNS
                             </button>
                             <button
                                 onClick={() => onLoadForEditing(project)}
                                 className="py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold text-sm shadow-lg shadow-indigo-900/20 transition-all flex items-center justify-center gap-2"
                             >
-                                <Pencil className="w-4 h-4" /> Re-edit
+                                Re-edit
                             </button>
                         </div>
 

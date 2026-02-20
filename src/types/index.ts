@@ -23,6 +23,17 @@ export interface ScrapedPost {
     content: string;
     images: string[];
     files?: { name: string; url: string }[];
+    matchedFilters?: { id: string; name: string; type: 'include' | 'exclude'; matchedPhrases?: string[] }[];
+    sourceBoard?: string;
+    isMultiPost?: boolean;
+    selectedSources?: { title: string; date: string; link: string }[];
+}
+
+export interface PostFilter {
+    id: string;
+    name: string;
+    description: string;
+    type: 'include' | 'exclude';
 }
 
 export interface AnalysisResult {
@@ -94,4 +105,46 @@ export interface CaptionConfig {
             verticalPosition: 'top' | 'middle' | 'bottom';
         };
     };
+}
+
+export type WatermarkPosition = 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right' | 'center' | 'custom';
+
+export interface WatermarkConfig {
+    url: string | null;
+    position: WatermarkPosition; // preset or 'custom' for drag
+    x: number;       // 0.0–1.0  canvas-relative center X (used when position='custom')
+    y: number;       // 0.0–1.0  canvas-relative center Y (used when position='custom')
+    size: number;    // 0.05–0.5 as fraction of canvas width (default 0.15)
+    opacity: number; // 0.0–1.0  (default 0.8)
+}
+
+export const DEFAULT_WATERMARK_CONFIG: WatermarkConfig = {
+    url: null,
+    position: 'bottom-right',
+    x: 0.85,
+    y: 0.85,
+    size: 0.15,
+    opacity: 0.8,
+};
+
+export type ThumbnailPlatformKey = 'youtube' | 'instagram_square' | 'instagram_story' | 'tiktok';
+
+export const THUMBNAIL_PLATFORMS: Record<ThumbnailPlatformKey, { label: string; w: number; h: number }> = {
+    youtube: { label: 'YouTube 16:9 FHD', w: 1920, h: 1080 },
+    instagram_square: { label: 'Instagram 1:1', w: 1080, h: 1080 },
+    instagram_story: { label: 'Instagram/TikTok Story 9:16', w: 1080, h: 1920 },
+    tiktok: { label: 'TikTok 9:16', w: 1080, h: 1920 },
+};
+
+export type ThumbnailTitleStyle = 'bold_bottom' | 'gradient_top' | 'center_glow' | 'minimal';
+
+export interface ThumbnailConfig {
+    sceneIndex: number;           // which sceneItem to use as background
+    platform: ThumbnailPlatformKey;
+    title: string;                // overlay text
+    titleStyle: ThumbnailTitleStyle;
+    bgBlur: number;               // 0–20px
+    textColor: string;            // default '#FFFFFF'
+    strokeColor: string;          // default '#000000'
+    overlayDarkness: number;      // 0.0–0.8
 }
